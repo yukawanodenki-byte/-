@@ -1,0 +1,64 @@
+<%- include('header', { title: 'バックアップ' }) %>
+<h1>バックアップ</h1>
+<p class="helptext">案件・書類・チェックリスト・体制・更新履歴のデータを丸ごと保存したものです。誤操作やデータ破損があった場合、ここから元に戻せます。</p>
+
+<% if (message) { %>
+  <div class="card" style="border-color:var(--accent);"><%= message %></div>
+<% } %>
+
+<div class="card">
+  <h2>⚠ 大事な注意（必ず読んでください）</h2>
+  <p>ここに並んでいるバックアップは、<strong>このアプリが使っているデータベースの中に保存</strong>されています。そのため、「入力ミスで消してしまった」「間違えて上書きした」といった<strong>アプリの操作ミスからは守れます</strong>が、データベースそのものが削除・破損した場合はバックアップも一緒に失われるため守れません（無料プランのデータベースは一定期間で自動削除される期限があります。詳しくは会社に伝えている案内を参照してください）。</p>
+  <p><strong>本当の意味で安全に保管するには、下の「⬇ ダウンロード」で定期的にJSONファイルとしてパソコンに保存しておくことを強くおすすめします。</strong>ダウンロードしたファイルは、お使いのブラウザの保存先設定を「デスクトップの『チェックリスト バックアップ』フォルダ」等にしておけば、ボタンを押すだけで毎回そこに保存されます。</p>
+</div>
+
+<div class="card">
+  <h2>自動バックアップについて</h2>
+  <p>このシステムに誰かがアクセスするたびに確認し、<strong>最後の自動バックアップから24時間以上経っていれば新しく1件作成</strong>します（直近14件まで保持、それより古い自動バックアップは自動的に削除されます）。しばらく誰もアクセスしないと更新が止まる点にはご注意ください（毎日必ず誰かが一度は開くページ＝案件一覧を開けば動きます）。</p>
+  <form method="post" action="/backup/create">
+    <button class="btn" type="submit">📦 今すぐ手動でバックアップを作成</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>バックアップ一覧</h2>
+  <% if (backups.length === 0) { %>
+    <p>まだバックアップがありません。</p>
+  <% } else { %>
+    <table>
+      <thead>
+        <tr><th>作成日時</th><th>種類</th><th>案件数</th><th>作成者</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% backups.forEach(b => { %>
+          <tr>
+            <td><%= new Date(b.created_at).toLocaleString('ja-JP') %></td>
+            <td>
+              <% if (b.kind === 'auto') { %>自動
+              <% } else if (b.kind === 'manual') { %>手動
+              <% } else { %>復元直前の自動退避
+              <% } %>
+            </td>
+            <td><%= b.project_count %>件</td>
+            <td><%= b.created_by_name || '（自動）' %></td>
+            <td style="display:flex;gap:8px;">
+              <a class="btn secondary" href="/backup/<%= b.id %>/download">⬇ ダウンロード</a>
+              <form method="post" action="/backup/<%= b.id %>/restore"
+                onsubmit="return confirm('本当にこのバックアップ（' + '<%= new Date(b.created_at).toLocaleString('ja-JP') %>' + '時点）の状態に戻しますか？\n\n現在のデータは上書きされます（ただし復元直前の状態も自動でバックアップされるので、間違えてもさらに戻すことはできます）。')">
+                <button class="btn secondary" type="submit" style="color:var(--red);border-color:var(--red);">⏪ このバックアップから復元</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2>復元の仕組み・確認済みの動作</h2>
+  <p>「復元」を押すと、①まず現在のデータを「復元直前の自動退避」として保存し、②選んだバックアップの内容（案件・必須書類・チェックリスト・体制・更新履歴）で現在のデータを丸ごと置き換えます。<strong>ログインアカウント（ユーザー名・パスワード）は復元の対象外</strong>なので、間違って巻き戻ることはありません。復元後にやっぱり戻したい場合は、一覧に追加された「復元直前の自動退避」から再度復元してください。</p>
+  <p class="helptext">この復元の仕組みは、開発時にテストデータで「バックアップ作成 → データを書き換え・削除 → 復元 → 元通りになっているか確認」という手順で動作確認済みです。</p>
+</div>
+
+<%- include('footer') %>

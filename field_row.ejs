@@ -3,6 +3,7 @@
   // どちらからも同じ見た目・同じJSで動かすための共通パーツ。
   const row = statusRow || { status: 'not_started' };
   const due = row.due_date ? row.due_date.toISOString().slice(0, 10) : '';
+  const submittedAt = row.submitted_at ? row.submitted_at.toISOString().slice(0, 10) : '';
   const alertLevel = row.alertLevel || 'none';
 %>
 <div class="field-row" data-kind="<%= kind %>" data-project="<%= projectId %>" data-ref="<%= ref %>">
@@ -25,8 +26,14 @@
   </div>
   <% if (description) { %><div class="field-desc"><%= description %></div><% } %>
   <div class="field-row-controls">
-    <label class="mini-label">期限
+    <label class="mini-label">期限（予定）
       <input type="date" class="field-due" value="<%= due %>">
+    </label>
+    <label class="mini-label">提出日（実績）
+      <input type="date" class="field-submitted-at" value="<%= submittedAt %>">
+    </label>
+    <label class="mini-label">提出方法
+      <input type="text" class="field-submission-method" value="<%= row.submission_method || '' %>" placeholder="例: 郵送・持参・電子申請 等">
     </label>
     <label class="mini-label">保存先リンク（ドラッグ＆ドロップ可）
       <input type="text" class="field-link dropzone" value="<%= row.link_url || '' %>" placeholder="共有サーバー上の保存先 or ファイル/フォルダをドラッグ">

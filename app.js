@@ -52,12 +52,26 @@
     const openBtn = row.querySelector('.field-open-link');
     const noteWrap = row.querySelector('.field-note-wrap');
     const noteInput = row.querySelector('.field-note');
+    const submittedAtInput = row.querySelector('.field-submitted-at');
+    const submissionMethodInput = row.querySelector('.field-submission-method');
+
+    function saveSubmission() {
+      postJSON(`${base}/submission`, {
+        submitted_at: submittedAtInput ? submittedAtInput.value : '',
+        submission_method: submissionMethodInput ? submissionMethodInput.value : '',
+      });
+    }
 
     if (statusSel) {
       statusSel.addEventListener('change', () => {
         applyStatusClass(statusSel);
         if (noteWrap) noteWrap.style.display = statusSel.value === 'not_applicable' ? '' : 'none';
         postJSON(`${base}/status`, { status: statusSel.value });
+        // 「提出済み」に変えたのに提出日が空なら、今日の日付を自動で入れておく（入れ忘れ防止。手で修正も可能）
+        if (statusSel.value === 'submitted' && submittedAtInput && !submittedAtInput.value) {
+          submittedAtInput.value = new Date().toISOString().slice(0, 10);
+          saveSubmission();
+        }
       });
     }
     if (dueInput) {
@@ -65,6 +79,8 @@
         postJSON(`${base}/due`, { due_date: dueInput.value });
       });
     }
+    if (submittedAtInput) submittedAtInput.addEventListener('change', saveSubmission);
+    if (submissionMethodInput) submissionMethodInput.addEventListener('change', saveSubmission);
     if (linkInput) {
       linkInput.addEventListener('change', () => {
         if (openBtn) {
@@ -127,6 +143,39 @@
       }
     });
   });
+
+  // ---- 画面配色（白基調／黒基調／青基調をメンバーごとに選択・保存） ----
+  const themeSwitcher = document.querySelector('.theme-switcher');
+  if (themeSwitcher) {
+    function markActiveTheme(theme) {
+      themeSwitcher.querySelectorAll('.theme-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.themeChoice === theme);
+      });
+    }
+    markActiveTheme(themeSwitcher.dataset.current || 'white');
+    themeSwitcher.querySelectorAll('.theme-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const theme = btn.dataset.themeChoice;
+        document.documentElement.setAttribute('data-theme', theme);
+        markActiveTheme(theme);
+        postJSON('/api/theme', { theme });
+      });
+    });
+  }
+
+  // ---- チェックリスト区分の「すべて開く／すべて閉じる」 ----
+  const expandAllBtn = document.getElementById('expandAllCategories');
+  const collapseAllBtn = document.getElementById('collapseAllCategories');
+  if (expandAllBtn) {
+    expandAllBtn.addEventListener('click', () => {
+      document.querySelectorAll('.checklist-category').forEach((d) => { d.open = true; });
+    });
+  }
+  if (collapseAllBtn) {
+    collapseAllBtn.addEventListener('click', () => {
+      document.querySelectorAll('.checklist-category').forEach((d) => { d.open = false; });
+    });
+  }
 
   // ---- 基本情報（自動保存：どの項目を変更しても保存ボタン無しですぐ保存される） ----
   const basicInfoForm = document.getElementById('basicInfoForm');

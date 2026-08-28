@@ -133,15 +133,22 @@
       extraLink: key === 'uchiwakesho' ? { href: '/templates', label: '📄 雛形をプレビュー' } : null,
     }) %>
   <% }) %>
-  <p class="helptext">ステータスは「未着手／作成中／提出済み／修正中／対象外」の5段階です。提出の必要がない書類は「対象外」を選び、根拠欄に理由を記入してください。リンク欄には共有サーバー上の保存先（フォルダ/ファイルのパスやURL）を入力してください。ファイルそのものはこの画面には保存されません。</p>
+  <p class="helptext">ステータスは「未着手／作成中／提出済み／修正中／対象外」の5段階です。提出の必要がない書類は「対象外」を選び、根拠欄に理由を記入してください。「期限」は提出予定日、「提出日」は実際に提出できた日です（ステータスを「提出済み」に変えると、提出日が未入力なら自動で今日の日付が入ります。違う日に提出した場合は手で直してください）。リンク欄には共有サーバー上の保存先（フォルダ/ファイルのパスやURL）を入力してください。ファイルそのものはこの画面には保存されません。</p>
 </div>
 
 <div class="card">
-  <h2>チェックリスト</h2>
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <h2>チェックリスト</h2>
+    <span>
+      <button type="button" class="btn secondary" id="expandAllCategories">すべて開く</button>
+      <button type="button" class="btn secondary" id="collapseAllCategories">すべて閉じる</button>
+    </span>
+  </div>
+  <p class="helptext">区分（①②③④…）は初期状態では閉じています。見出しをクリックすると開閉できます。未完了の項目がある区分ほど上の数字が小さく表示されます。</p>
   <% itemsByCategory.forEach(group => {
     const catDone = group.items.filter(it => ['submitted','not_applicable'].includes((statusMap[it.id]||{}).status)).length;
   %>
-    <details class="checklist-category" open>
+    <details class="checklist-category">
       <summary><%= group.category.name %> <span class="cat-count">(<%= catDone %>/<%= group.items.length %>)</span></summary>
       <% group.items.forEach(item => {
         const row = statusMap[item.id] || { status: 'not_started' };

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-theme="<%= (locals.currentUser && currentUser.theme) || 'white' %>">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,10 +15,16 @@
     <a href="/timeline">年間工程表</a>
     <a href="/templates">書類テンプレート</a>
     <a href="/import">貼り付けインポート</a>
+    <a href="/backup">バックアップ</a>
     <a href="/users">メンバー管理</a>
     <a href="/manual">使い方マニュアル</a>
   </nav>
   <div class="user">
+    <span class="theme-switcher" data-current="<%= currentUser.theme || 'white' %>">
+      <button type="button" class="theme-btn" data-theme-choice="white" title="白基調">☀</button>
+      <button type="button" class="theme-btn" data-theme-choice="blue" title="青基調">💧</button>
+      <button type="button" class="theme-btn" data-theme-choice="dark" title="黒基調">🌙</button>
+    </span>
     <%= currentUser.display_name %>さん
     <form method="post" action="/logout" style="display:inline">
       <button class="link" type="submit">ログアウト</button>

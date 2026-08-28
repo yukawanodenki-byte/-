@@ -10,6 +10,10 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- 画面配色（メンバーごとに白基調／黒基調／青基調を選べる。ログインアカウントに紐づくので端末が変わっても引き継がれる）
+ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT NOT NULL DEFAULT 'white';
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_theme_check;
+ALTER TABLE users ADD CONSTRAINT users_theme_check CHECK (theme IN ('white', 'dark', 'blue'));
 
 CREATE TABLE IF NOT EXISTS projects (
   id                SERIAL PRIMARY KEY,
@@ -74,6 +78,9 @@ ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS status_note TEXT;
 ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS contractor_name TEXT;   -- 依頼先の協力業者名
 ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS requested_at DATE;      -- 依頼日
 ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS request_detail TEXT;    -- いつどんな依頼をしたか（自由記述）
+-- 実際に提出できた日・提出方法（期限＝予定、提出日＝実績、として区別する）
+ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS submitted_at DATE;         -- 提出日（実績）
+ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS submission_method TEXT;    -- 提出方法（例: 郵送・持参・電子申請等）
 ALTER TABLE required_documents DROP CONSTRAINT IF EXISTS required_documents_status_check;
 ALTER TABLE required_documents ADD CONSTRAINT required_documents_status_check
   CHECK (status IN ('not_started','in_progress','submitted','revising','not_applicable'));
@@ -116,6 +123,9 @@ ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS status_note TEXT;
 ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS contractor_name TEXT;
 ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS requested_at DATE;
 ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS request_detail TEXT;
+-- 実際に提出できた日・提出方法（期限＝予定、提出日＝実績、として区別する）
+ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS submitted_at DATE;
+ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS submission_method TEXT;
 ALTER TABLE checklist_status DROP CONSTRAINT IF EXISTS checklist_status_status_check;
 ALTER TABLE checklist_status ADD CONSTRAINT checklist_status_status_check
   CHECK (status IN ('not_started','in_progress','submitted','revising','not_applicable'));
@@ -135,6 +145,17 @@ CREATE TABLE IF NOT EXISTS activity_log (
   detail      TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- バックアップ（案件・書類・チェックリスト・体制・履歴データの丸ごとスナップショット）
+-- 「データ破損・保存状況の消失」対策。自動（毎日1回・直近分のみ保持）／手動／復元直前の3種類を保存する。
+CREATE TABLE IF NOT EXISTS backups (
+  id          SERIAL PRIMARY KEY,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  kind        TEXT NOT NULL DEFAULT 'auto', -- 'auto' | 'manual' | 'pre_restore'
+  created_by  INT REFERENCES users(id),      -- 自動保存の場合はNULL
+  data        JSONB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_backups_created_at ON backups(created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_activity_log_project ON activity_log(project_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_technicians_dates ON project_technicians(start_date, end_date);

@@ -5,6 +5,7 @@ const pgSession = require('connect-pg-simple')(session);
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const { pool, initSchema } = require('./index');
+const { createBackup, maybeRunAutoBackup, listBackups, getBackup, restoreBackup } = require('./backup');
 
 const app = express();
 app.set('view engine', 'ejs');
@@ -40,7 +41,7 @@ function requireAuth(req, res, next) {
 app.use(async (req, res, next) => {
   res.locals.currentUser = null;
   if (req.session.userId) {
-    const { rows } = await pool.query('SELECT id, username, display_name FROM users WHERE id = $1', [req.session.userId]);
+    const { rows } = await pool.query('SELECT id, username, display_name, theme FROM users WHERE id = $1', [req.session.userId]);
     res.locals.currentUser = rows[0] || null;
   }
   next();
@@ -77,6 +78,13 @@ app.post('/login', async (req, res) => {
 
 app.post('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/login'));
+});
+
+// ---- 画面配色（メンバーごとに選択、ログインアカウントに保存） ----
+app.post('/api/theme', requireAuth, async (req, res) => {
+  const theme = ['white', 'dark', 'blue'].includes(req.body.theme) ? req.body.theme : 'white';
+  await pool.query('UPDATE users SET theme = $1 WHERE id = $2', [theme, req.session.userId]);
+  res.json({ ok: true, theme });
 });
 
 // ---- users (teammates) ----
@@ -369,6 +377,9 @@ async function computeUpcomingDeadlines() {
 }
 
 app.get('/', requireAuth, async (req, res) => {
+  // 機会主義的な自動バックアップ：最後の自動バックアップから24時間以上経っていたら作成する
+  // （ページ表示を遅らせないよう、結果を待たずに実行する）
+  maybeRunAutoBackup(pool).catch((e) => console.error('自動バックアップに失敗しました', e));
   const { summaries } = await computeProjectSummaries();
   const upcomingDeadlines = await computeUpcomingDeadlines();
   res.render('dashboard', { summaries, upcomingDeadlines, STATUS_LABELS });
@@ -474,6 +485,46 @@ app.get('/template-files/:filename', (req, res) => {
   const file = TEMPLATE_FILES.find((t) => t.filename === req.params.filename);
   if (!file) return res.status(404).send('Not found');
   res.sendFile(path.join(__dirname, file.filename));
+});
+
+// ---- バックアップ（データ破損・消失対策） ----
+app.get('/backup', requireAuth, async (req, res) => {
+  const backups = await listBackups(pool);
+  res.render('backup', { backups, message: req.query.message || null });
+});
+
+app.post('/backup/create', requireAuth, async (req, res) => {
+  await createBackup(pool, 'manual', req.session.userId);
+  res.redirect('/backup?message=' + encodeURIComponent('手動バックアップを作成しました'));
+});
+
+app.get('/backup/:id/download', requireAuth, async (req, res) => {
+  const backup = await getBackup(pool, Number(req.params.id));
+  if (!backup) return res.status(404).send('指定されたバックアップが見つかりません');
+  const dateStr = new Date(backup.created_at).toISOString().slice(0, 10);
+  const filename = `koji-checklist-backup-${dateStr}-${backup.id}.json`;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(JSON.stringify(backup.data, null, 2));
+});
+
+app.post('/backup/:id/restore', requireAuth, async (req, res) => {
+  try {
+    const result = await restoreBackup(pool, Number(req.params.id), req.session.userId);
+    await logActivity(
+      null,
+      req.session.userId,
+      'restore_backup',
+      `バックアップ #${req.params.id}（${new Date(result.restored.created_at).toLocaleString('ja-JP')}時点）から復元しました。復元直前の状態はバックアップ #${result.safetyBackupId} として自動保存済みです。`
+    );
+    res.redirect('/backup?message=' + encodeURIComponent('復元が完了しました'));
+  } catch (e) {
+    console.error('バックアップの復元に失敗しました', e);
+    res.status(500).render('backup', {
+      backups: await listBackups(pool),
+      message: '復元に失敗しました: ' + e.message,
+    });
+  }
 });
 
 // ---- 使い方マニュアル ----
@@ -745,6 +796,21 @@ app.post('/api/projects/:id/items/:itemId/contractor', requireAuth, async (req, 
   res.json({ ok: true });
 });
 
+app.post('/api/projects/:id/items/:itemId/submission', requireAuth, async (req, res) => {
+  const projectId = Number(req.params.id);
+  const itemId = Number(req.params.itemId);
+  const submittedAt = (req.body.submitted_at || '').trim() || null;
+  const submissionMethod = (req.body.submission_method || '').trim() || null;
+  await pool.query(
+    `INSERT INTO checklist_status (project_id, item_id, submitted_at, submission_method, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5, now())
+     ON CONFLICT (project_id, item_id) DO UPDATE SET
+       submitted_at=$3, submission_method=$4, updated_by=$5, updated_at=now()`,
+    [projectId, itemId, submittedAt, submissionMethod, req.session.userId]
+  );
+  res.json({ ok: true });
+});
+
 // ---- ajax: required document ----
 app.post('/api/projects/:id/documents/:docKey/status', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
@@ -815,6 +881,21 @@ app.post('/api/projects/:id/documents/:docKey/contractor', requireAuth, async (r
   res.json({ ok: true });
 });
 
+app.post('/api/projects/:id/documents/:docKey/submission', requireAuth, async (req, res) => {
+  const projectId = Number(req.params.id);
+  const docKey = req.params.docKey;
+  const submittedAt = (req.body.submitted_at || '').trim() || null;
+  const submissionMethod = (req.body.submission_method || '').trim() || null;
+  await pool.query(
+    `INSERT INTO required_documents (project_id, doc_key, submitted_at, submission_method, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5, now())
+     ON CONFLICT (project_id, doc_key) DO UPDATE SET
+       submitted_at=$3, submission_method=$4, updated_by=$5, updated_at=now()`,
+    [projectId, docKey, submittedAt, submissionMethod, req.session.userId]
+  );
+  res.json({ ok: true });
+});
+
 // ---- ajax: technician update ----
 app.post('/api/projects/:id/technicians/:role', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
@@ -838,6 +919,7 @@ async function start() {
   const { seedIfEmpty, syncCatalogText } = require('./seed');
   await seedIfEmpty(); // チェックリストカタログ・初期ユーザーが空なら投入（既に投入済みなら何もしない）
   await syncCatalogText(); // コード側のCATEGORIES定義（文言・説明文）を毎回DBへ同期
+  maybeRunAutoBackup(pool).catch((e) => console.error('起動時の自動バックアップに失敗しました', e));
   app.listen(PORT, () => console.log(`koji-checklist listening on :${PORT}`));
 }
 
