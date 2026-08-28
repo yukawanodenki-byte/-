@@ -16,12 +16,20 @@
     <input type="text" name="contract_amount" value="<%= project.contract_amount || '' %>">
     <label>工期</label>
     <input type="text" name="period_text" value="<%= project.period_text || '' %>">
+    <label>共有フォルダのリンク</label>
+    <input type="text" name="folder_url" value="<%= project.folder_url || '' %>" placeholder="例: \\server\projects\〇〇工事 または https://...">
+    <p class="helptext">全員が使っている共有サーバー上のこの案件のフォルダへのリンクです。保存すると案件一覧・このページ上部からすぐ開けます。</p>
     <div style="margin-top:12px;">
       <button class="btn" type="submit">保存</button>
       <button class="btn secondary" type="submit" formaction="/projects/<%= project.id %>/archive"
         onclick="return confirm('この案件をアーカイブしますか？一覧から非表示になります。')">アーカイブ</button>
     </div>
   </form>
+  <% if (project.folder_url) { %>
+    <div style="margin-top:12px;">
+      <a class="btn secondary" href="<%= project.folder_url %>" target="_blank" rel="noopener">📁 共有フォルダを開く</a>
+    </div>
+  <% } %>
 </div>
 
 <div class="card">
@@ -60,15 +68,25 @@
 
 <div class="card">
   <h2>必須書類</h2>
-  <div class="doc-grid">
-    <% REQUIRED_DOC_KEYS.forEach(key => { %>
-      <label class="doc-item">
-        <input type="checkbox" class="doc-toggle" data-project="<%= project.id %>" data-key="<%= key %>" <%= docsMap[key] ? 'checked' : '' %>>
-        <%= REQUIRED_DOC_LABELS[key] %>
-      </label>
+  <div class="doc-grid-v2">
+    <% REQUIRED_DOC_KEYS.forEach(key => {
+      const d = docsMap[key] || { status: 'not_started', link_url: '' };
+    %>
+      <div class="doc-item-v2">
+        <div class="doc-item-name"><%= REQUIRED_DOC_LABELS[key] %></div>
+        <select class="status-select doc-status" data-project="<%= project.id %>" data-key="<%= key %>">
+          <% STATUS_VALUES.forEach(sv => { %>
+            <option value="<%= sv %>" <%= d.status === sv ? 'selected' : '' %>><%= STATUS_LABELS[sv] %></option>
+          <% }) %>
+        </select>
+        <input type="text" class="doc-link" data-project="<%= project.id %>" data-key="<%= key %>"
+          value="<%= d.link_url || '' %>" placeholder="保存先フォルダ/ファイルのリンク">
+        <a class="btn secondary doc-open-link" href="<%= d.link_url || '#' %>" target="_blank" rel="noopener"
+          style="<%= d.link_url ? '' : 'visibility:hidden' %>">開く</a>
+      </div>
     <% }) %>
   </div>
-  <p class="helptext">ここはファイルそのものを保存する機能ではなく、書類がそろっているかどうかのチェックです。実ファイルはClaudeプロジェクトのナレッジベースや社内共有フォルダで管理してください。</p>
+  <p class="helptext">ステータスは「未着手／作成中／提出済み／修正中」の4段階です。リンク欄には共有サーバー上の保存先（フォルダ/ファイルのパスやURL）を入力してください。ファイルそのものはこの画面には保存されません。</p>
 </div>
 
 <div class="card">
@@ -76,11 +94,17 @@
   <% itemsByCategory.forEach(group => { %>
     <div class="checklist-category">
       <h3><%= group.category.name %></h3>
-      <% group.items.forEach(item => { %>
-        <label class="checklist-item">
-          <input type="checkbox" class="item-toggle" data-project="<%= project.id %>" data-item="<%= item.id %>" <%= checkedMap[item.id] ? 'checked' : '' %>>
+      <% group.items.forEach(item => {
+        const st = statusMap[item.id] || 'not_started';
+      %>
+        <div class="checklist-item-v2">
+          <select class="status-select item-status" data-project="<%= project.id %>" data-item="<%= item.id %>">
+            <% STATUS_VALUES.forEach(sv => { %>
+              <option value="<%= sv %>" <%= st === sv ? 'selected' : '' %>><%= STATUS_LABELS[sv] %></option>
+            <% }) %>
+          </select>
           <span><%= item.text %><% if (item.note) { %><span class="note">（<%= item.note %>）</span><% } %></span>
-        </label>
+        </div>
       <% }) %>
     </div>
   <% }) %>

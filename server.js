@@ -108,11 +108,11 @@ async function computeProjectSummaries() {
 
   const statusByProject = {};
   for (const s of statuses) {
-    (statusByProject[s.project_id] ||= {})[s.item_id] = s.checked;
+    (statusByProject[s.project_id] ||= {})[s.item_id] = s.status;
   }
   const docsByProject = {};
   for (const d of docs) {
-    (docsByProject[d.project_id] ||= {})[d.doc_key] = d.obtained;
+    (docsByProject[d.project_id] ||= {})[d.doc_key] = d.status;
   }
   const techsByProject = {};
   for (const t of techs) {
@@ -140,14 +140,16 @@ async function computeProjectSummaries() {
   }
 
   const summaries = projects.map((p) => {
-    const checked = statusByProject[p.id] || {};
+    const itemStatus = statusByProject[p.id] || {};
     const totalItems = items.length;
-    const doneItems = items.filter((it) => checked[it.id]).length;
+    const doneItems = items.filter((it) => itemStatus[it.id] === 'submitted').length;
+    const revisingItems = items.filter((it) => itemStatus[it.id] === 'revising').length;
+    const inProgressItems = items.filter((it) => itemStatus[it.id] === 'in_progress').length;
 
     let currentCategory = categories[categories.length - 1];
     for (const cat of categories) {
       const catItems = items.filter((it) => it.category_id === cat.id);
-      const allDone = catItems.every((it) => checked[it.id]);
+      const allDone = catItems.every((it) => itemStatus[it.id] === 'submitted');
       if (!allDone) {
         currentCategory = cat;
         break;
@@ -155,7 +157,8 @@ async function computeProjectSummaries() {
     }
 
     const docStatus = docsByProject[p.id] || {};
-    const docDoneCount = REQUIRED_DOC_KEYS.filter((k) => docStatus[k]).length;
+    const docDoneCount = REQUIRED_DOC_KEYS.filter((k) => docStatus[k] === 'submitted').length;
+    const docRevisingCount = REQUIRED_DOC_KEYS.filter((k) => docStatus[k] === 'revising').length;
 
     let overlapBadge = null;
     if (overlapProjectIds.has(p.id + ':red')) overlapBadge = 'red';
@@ -166,8 +169,11 @@ async function computeProjectSummaries() {
       progress: totalItems ? Math.round((doneItems / totalItems) * 100) : 0,
       doneItems,
       totalItems,
+      revisingItems,
+      inProgressItems,
       currentStage: currentCategory ? currentCategory.name : '-',
       docDoneCount,
+      docRevisingCount,
       docTotalCount: REQUIRED_DOC_KEYS.length,
       technicians: techsByProject[p.id] || [],
       overlapBadge,
@@ -186,6 +192,18 @@ const REQUIRED_DOC_LABELS = {
   keiyakusho: '契約書',
   uchiwakesho: '工事費内訳書',
 };
+
+// ステータス4段階：未着手／作成中／提出済み／修正中
+const STATUS_VALUES = ['not_started', 'in_progress', 'submitted', 'revising'];
+const STATUS_LABELS = {
+  not_started: '未着手',
+  in_progress: '作成中',
+  submitted: '提出済み',
+  revising: '修正中',
+};
+function normalizeStatus(v) {
+  return STATUS_VALUES.includes(v) ? v : 'not_started';
+}
 
 app.get('/', requireAuth, async (req, res) => {
   const { summaries } = await computeProjectSummaries();
@@ -278,10 +296,10 @@ app.get('/projects/:id', requireAuth, async (req, res) => {
     [projectId]
   );
 
-  const checkedMap = {};
-  for (const s of statuses) checkedMap[s.item_id] = s.checked;
+  const statusMap = {};
+  for (const s of statuses) statusMap[s.item_id] = s.status;
   const docsMap = {};
-  for (const d of docs) docsMap[d.doc_key] = d.obtained;
+  for (const d of docs) docsMap[d.doc_key] = { status: d.status, link_url: d.link_url };
   const techMap = {};
   for (const t of techs) techMap[t.role] = t;
 
@@ -293,21 +311,23 @@ app.get('/projects/:id', requireAuth, async (req, res) => {
   res.render('project', {
     project,
     itemsByCategory,
-    checkedMap,
+    statusMap,
     docsMap,
     techMap,
     activity,
     REQUIRED_DOC_KEYS,
     REQUIRED_DOC_LABELS,
+    STATUS_VALUES,
+    STATUS_LABELS,
   });
 });
 
 app.post('/projects/:id/info', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
-  const { name, agency, contract_amount, period_text } = req.body;
+  const { name, agency, contract_amount, period_text, folder_url } = req.body;
   await pool.query(
-    'UPDATE projects SET name=$1, agency=$2, contract_amount=$3, period_text=$4, updated_at=now(), updated_by=$5 WHERE id=$6',
-    [name, agency, contract_amount, period_text, req.session.userId, projectId]
+    'UPDATE projects SET name=$1, agency=$2, contract_amount=$3, period_text=$4, folder_url=$5, updated_at=now(), updated_by=$6 WHERE id=$7',
+    [name, agency, contract_amount, period_text, folder_url || null, req.session.userId, projectId]
   );
   await logActivity(projectId, req.session.userId, 'update_info', '基本情報を更新');
   res.redirect('/projects/' + projectId);
@@ -320,30 +340,46 @@ app.post('/projects/:id/archive', requireAuth, async (req, res) => {
   res.redirect('/');
 });
 
-// ---- ajax: checklist item toggle ----
-app.post('/api/projects/:id/items/:itemId/toggle', requireAuth, async (req, res) => {
+// ---- ajax: checklist item status ----
+app.post('/api/projects/:id/items/:itemId/status', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
   const itemId = Number(req.params.itemId);
-  const { checked } = req.body;
+  const status = normalizeStatus(req.body.status);
+  const checked = status === 'submitted'; // 旧カラムも一応揃えておく（互換用）
   await pool.query(
-    `INSERT INTO checklist_status (project_id, item_id, checked, updated_by, updated_at)
-     VALUES ($1,$2,$3,$4, now())
-     ON CONFLICT (project_id, item_id) DO UPDATE SET checked = $3, updated_by = $4, updated_at = now()`,
-    [projectId, itemId, !!checked, req.session.userId]
+    `INSERT INTO checklist_status (project_id, item_id, status, checked, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5, now())
+     ON CONFLICT (project_id, item_id) DO UPDATE SET status = $3, checked = $4, updated_by = $5, updated_at = now()`,
+    [projectId, itemId, status, checked, req.session.userId]
   );
   res.json({ ok: true });
 });
 
-// ---- ajax: required document toggle ----
-app.post('/api/projects/:id/documents/:docKey/toggle', requireAuth, async (req, res) => {
+// ---- ajax: required document status ----
+app.post('/api/projects/:id/documents/:docKey/status', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
   const docKey = req.params.docKey;
-  const { obtained } = req.body;
+  const status = normalizeStatus(req.body.status);
+  const obtained = status === 'submitted'; // 旧カラムも一応揃えておく（互換用）
   await pool.query(
-    `INSERT INTO required_documents (project_id, doc_key, obtained, updated_by, updated_at)
+    `INSERT INTO required_documents (project_id, doc_key, status, obtained, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5, now())
+     ON CONFLICT (project_id, doc_key) DO UPDATE SET status = $3, obtained = $4, updated_by = $5, updated_at = now()`,
+    [projectId, docKey, status, obtained, req.session.userId]
+  );
+  res.json({ ok: true });
+});
+
+// ---- ajax: required document link (共有フォルダ/ファイルのリンク) ----
+app.post('/api/projects/:id/documents/:docKey/link', requireAuth, async (req, res) => {
+  const projectId = Number(req.params.id);
+  const docKey = req.params.docKey;
+  const linkUrl = (req.body.link_url || '').trim() || null;
+  await pool.query(
+    `INSERT INTO required_documents (project_id, doc_key, link_url, updated_by, updated_at)
      VALUES ($1,$2,$3,$4, now())
-     ON CONFLICT (project_id, doc_key) DO UPDATE SET obtained = $3, updated_by = $4, updated_at = now()`,
-    [projectId, docKey, !!obtained, req.session.userId]
+     ON CONFLICT (project_id, doc_key) DO UPDATE SET link_url = $3, updated_by = $4, updated_at = now()`,
+    [projectId, docKey, linkUrl, req.session.userId]
   );
   res.json({ ok: true });
 });

@@ -22,9 +22,21 @@
       <div class="stage"><%= s.currentStage %></div>
       <div class="progress-bar"><div style="width:<%= s.progress %>%"></div></div>
       <div class="meta-row">
-        <span>チェックリスト <%= s.doneItems %>/<%= s.totalItems %></span>
-        <span>必須書類 <%= s.docDoneCount %>/<%= s.docTotalCount %></span>
+        <span>
+          チェックリスト <%= s.doneItems %>/<%= s.totalItems %>
+          <% if (s.revisingItems > 0) { %><span class="badge red">修正中 <%= s.revisingItems %></span><% } %>
+          <% if (s.inProgressItems > 0) { %><span class="badge amber">作成中 <%= s.inProgressItems %></span><% } %>
+        </span>
+        <span>
+          必須書類 <%= s.docDoneCount %>/<%= s.docTotalCount %>
+          <% if (s.docRevisingCount > 0) { %><span class="badge red">修正中 <%= s.docRevisingCount %></span><% } %>
+        </span>
       </div>
+      <% if (s.project.folder_url) { %>
+        <div class="folder-link-row">
+          <a href="<%= s.project.folder_url %>" target="_blank" rel="noopener" onclick="event.stopPropagation()">📁 共有フォルダを開く</a>
+        </div>
+      <% } %>
     </a>
   <% }) %>
 </div>

@@ -26,19 +26,45 @@
     return res;
   }
 
-  document.querySelectorAll('.item-toggle').forEach((el) => {
+  function applyStatusClass(selectEl) {
+    selectEl.classList.remove('status-not_started', 'status-in_progress', 'status-submitted', 'status-revising');
+    selectEl.classList.add('status-' + selectEl.value);
+  }
+
+  document.querySelectorAll('.status-select').forEach((el) => applyStatusClass(el));
+
+  document.querySelectorAll('.item-status').forEach((el) => {
     el.addEventListener('change', () => {
+      applyStatusClass(el);
       const projectId = el.dataset.project;
       const itemId = el.dataset.item;
-      postJSON(`/api/projects/${projectId}/items/${itemId}/toggle`, { checked: el.checked });
+      postJSON(`/api/projects/${projectId}/items/${itemId}/status`, { status: el.value });
     });
   });
 
-  document.querySelectorAll('.doc-toggle').forEach((el) => {
+  document.querySelectorAll('.doc-status').forEach((el) => {
+    el.addEventListener('change', () => {
+      applyStatusClass(el);
+      const projectId = el.dataset.project;
+      const key = el.dataset.key;
+      postJSON(`/api/projects/${projectId}/documents/${key}/status`, { status: el.value });
+    });
+  });
+
+  document.querySelectorAll('.doc-link').forEach((el) => {
     el.addEventListener('change', () => {
       const projectId = el.dataset.project;
       const key = el.dataset.key;
-      postJSON(`/api/projects/${projectId}/documents/${key}/toggle`, { obtained: el.checked });
+      const openBtn = el.parentElement.querySelector('.doc-open-link');
+      if (openBtn) {
+        if (el.value.trim()) {
+          openBtn.href = el.value.trim();
+          openBtn.style.visibility = 'visible';
+        } else {
+          openBtn.style.visibility = 'hidden';
+        }
+      }
+      postJSON(`/api/projects/${projectId}/documents/${key}/link`, { link_url: el.value });
     });
   });
 
