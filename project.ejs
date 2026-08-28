@@ -1,6 +1,9 @@
 <%- include('header', { title: project.name }) %>
 <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-  <h1><%= project.name %></h1>
+  <div>
+    <h1><%= project.name %></h1>
+    <div class="assignee">👤 作成担当者: <%= assigneeName || '未設定' %><% if (agencyGroupKey) { %> ／ 発注機関系統: <%= agencyGroupKey %><% } %></div>
+  </div>
   <span class="save-indicator" id="saveIndicator"></span>
 </div>
 <p><a href="/">← 案件一覧に戻る</a></p>
@@ -16,9 +19,16 @@
     <input type="text" name="contract_amount" value="<%= project.contract_amount || '' %>">
     <label>工期</label>
     <input type="text" name="period_text" value="<%= project.period_text || '' %>">
+    <label>作成担当者</label>
+    <select name="assignee_user_id">
+      <option value="">未設定</option>
+      <% users.forEach(function (u) { %>
+        <option value="<%= u.id %>" <%= project.assignee_user_id === u.id ? 'selected' : '' %>><%= u.display_name %></option>
+      <% }) %>
+    </select>
     <label>共有フォルダのリンク</label>
     <input type="text" name="folder_url" value="<%= project.folder_url || '' %>" placeholder="例: \\server\projects\〇〇工事 または https://...">
-    <p class="helptext">全員が使っている共有サーバー上のこの案件のフォルダへのリンクです。保存すると案件一覧・このページ上部からすぐ開けます。</p>
+    <p class="helptext">全員が使っている共有サーバー上のこの案件のフォルダへのリンクです。保存すると案件一覧・このページ上部からすぐ開けます。書類ごとの保存先リンクは下の各行で個別に設定できます。</p>
     <div style="margin-top:12px;">
       <button class="btn" type="submit">保存</button>
       <button class="btn secondary" type="submit" formaction="/projects/<%= project.id %>/archive"
@@ -68,45 +78,41 @@
 
 <div class="card">
   <h2>必須書類</h2>
-  <div class="doc-grid-v2">
-    <% REQUIRED_DOC_KEYS.forEach(key => {
-      const d = docsMap[key] || { status: 'not_started', link_url: '' };
-    %>
-      <div class="doc-item-v2">
-        <div class="doc-item-name"><%= REQUIRED_DOC_LABELS[key] %></div>
-        <select class="status-select doc-status" data-project="<%= project.id %>" data-key="<%= key %>">
-          <% STATUS_VALUES.forEach(sv => { %>
-            <option value="<%= sv %>" <%= d.status === sv ? 'selected' : '' %>><%= STATUS_LABELS[sv] %></option>
-          <% }) %>
-        </select>
-        <input type="text" class="doc-link" data-project="<%= project.id %>" data-key="<%= key %>"
-          value="<%= d.link_url || '' %>" placeholder="保存先フォルダ/ファイルのリンク">
-        <a class="btn secondary doc-open-link" href="<%= d.link_url || '#' %>" target="_blank" rel="noopener"
-          style="<%= d.link_url ? '' : 'visibility:hidden' %>">開く</a>
-      </div>
-    <% }) %>
-  </div>
-  <p class="helptext">ステータスは「未着手／作成中／提出済み／修正中」の4段階です。リンク欄には共有サーバー上の保存先（フォルダ/ファイルのパスやURL）を入力してください。ファイルそのものはこの画面には保存されません。</p>
+  <% REQUIRED_DOC_KEYS.forEach(key => {
+    const row = docsMap[key] || { status: 'not_started' };
+    const precedentList = (precedents.docMap || {})[key] || [];
+  %>
+    <%- include('field_row', {
+      kind: 'doc', ref: key, projectId: project.id,
+      label: REQUIRED_DOC_LABELS[key], note: null,
+      description: REQUIRED_DOC_DESCRIPTIONS[key],
+      statusRow: row, precedents: precedentList,
+      STATUS_VALUES: STATUS_VALUES, STATUS_LABELS: STATUS_LABELS,
+    }) %>
+  <% }) %>
+  <p class="helptext">ステータスは「未着手／作成中／提出済み／修正中／対象外」の5段階です。提出の必要がない書類は「対象外」を選び、根拠欄に理由を記入してください。リンク欄には共有サーバー上の保存先（フォルダ/ファイルのパスやURL）を入力してください。ファイルそのものはこの画面には保存されません。</p>
 </div>
 
 <div class="card">
   <h2>チェックリスト</h2>
-  <% itemsByCategory.forEach(group => { %>
-    <div class="checklist-category">
-      <h3><%= group.category.name %></h3>
+  <% itemsByCategory.forEach(group => {
+    const catDone = group.items.filter(it => ['submitted','not_applicable'].includes((statusMap[it.id]||{}).status)).length;
+  %>
+    <details class="checklist-category" open>
+      <summary><%= group.category.name %> <span class="cat-count">(<%= catDone %>/<%= group.items.length %>)</span></summary>
       <% group.items.forEach(item => {
-        const st = statusMap[item.id] || 'not_started';
+        const row = statusMap[item.id] || { status: 'not_started' };
+        const precedentList = (precedents.itemMap || {})[item.id] || [];
       %>
-        <div class="checklist-item-v2">
-          <select class="status-select item-status" data-project="<%= project.id %>" data-item="<%= item.id %>">
-            <% STATUS_VALUES.forEach(sv => { %>
-              <option value="<%= sv %>" <%= st === sv ? 'selected' : '' %>><%= STATUS_LABELS[sv] %></option>
-            <% }) %>
-          </select>
-          <span><%= item.text %><% if (item.note) { %><span class="note">（<%= item.note %>）</span><% } %></span>
-        </div>
+        <%- include('field_row', {
+          kind: 'item', ref: item.id, projectId: project.id,
+          label: item.text, note: item.note,
+          description: item.description,
+          statusRow: row, precedents: precedentList,
+          STATUS_VALUES: STATUS_VALUES, STATUS_LABELS: STATUS_LABELS,
+        }) %>
       <% }) %>
-    </div>
+    </details>
   <% }) %>
 </div>
 

@@ -1,5 +1,7 @@
 -- 公共工事 落札後提出書類チェックリスト DBスキーマ
 -- 複数人が同じデータへ同時に読み書きできることを前提とした構成。
+-- このファイルは起動のたびに実行される。CREATE TABLE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS /
+-- DROP CONSTRAINT IF EXISTS + ADD CONSTRAINT の組み合わせで、何度実行しても安全（冪等）なようにしてある。
 
 CREATE TABLE IF NOT EXISTS users (
   id            SERIAL PRIMARY KEY,
@@ -10,20 +12,21 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS projects (
-  id               SERIAL PRIMARY KEY,
-  name             TEXT NOT NULL,
-  agency           TEXT,               -- 発注機関
-  contract_amount  TEXT,               -- 契約金額（表示用テキスト。税込/税抜など書式が案件毎に違うためテキスト保持）
-  period_text      TEXT,               -- 工期（表示用テキスト）
-  folder_url       TEXT,               -- 共有サーバー上のこの案件のフォルダへのリンク
-  stage_override   INT,                -- 手動で契約段階を上書きしたい場合(NULLなら自動計算)
-  archived         BOOLEAN NOT NULL DEFAULT false,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_by       INT REFERENCES users(id)
+  id                SERIAL PRIMARY KEY,
+  name              TEXT NOT NULL,
+  agency            TEXT,               -- 発注機関
+  contract_amount   TEXT,               -- 契約金額（表示用テキスト。税込/税抜など書式が案件毎に違うためテキスト保持）
+  period_text       TEXT,               -- 工期（表示用テキスト）
+  folder_url        TEXT,               -- 共有サーバー上のこの案件のフォルダへのリンク
+  assignee_user_id  INT REFERENCES users(id),  -- 案件の作成担当者
+  stage_override    INT,                -- 手動で契約段階を上書きしたい場合(NULLなら自動計算)
+  archived          BOOLEAN NOT NULL DEFAULT false,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by        INT REFERENCES users(id)
 );
--- 既存DBに対する追加カラム（新規作成時は上のCREATE TABLEで既に含まれるため実質no-op）
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS folder_url TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS assignee_user_id INT REFERENCES users(id);
 
 -- 体制・工程（監理技術者／主任技術者／現場代理人）。1案件につき役割ごとに1行。
 CREATE TABLE IF NOT EXISTS project_technicians (
@@ -45,26 +48,23 @@ CREATE TABLE IF NOT EXISTS required_documents (
   project_id   INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   doc_key      TEXT NOT NULL,   -- 'koukoku','setsumei','shiyousho','mitsumori','keiyakusho','uchiwakesho'
   obtained     BOOLEAN NOT NULL DEFAULT false,  -- 旧カラム（互換用に残置。新規コードはstatusを参照）
-  status       TEXT NOT NULL DEFAULT 'not_started'
-               CHECK (status IN ('not_started','in_progress','submitted','revising')),
+  status       TEXT NOT NULL DEFAULT 'not_started',
   link_url     TEXT,            -- 共有サーバー上のこの書類（フォルダ/ファイル）へのリンク
+  due_date     DATE,            -- 提出期限
+  status_note  TEXT,            -- status='not_applicable'の場合の根拠等のメモ
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_by   INT REFERENCES users(id),
   UNIQUE(project_id, doc_key)
 );
 ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'not_started';
 ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS link_url TEXT;
-DO $$ BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.constraint_column_usage
-    WHERE table_name = 'required_documents' AND constraint_name = 'required_documents_status_check'
-  ) THEN
-    ALTER TABLE required_documents ADD CONSTRAINT required_documents_status_check
-      CHECK (status IN ('not_started','in_progress','submitted','revising'));
-  END IF;
-END $$;
+ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS due_date DATE;
+ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS status_note TEXT;
+ALTER TABLE required_documents DROP CONSTRAINT IF EXISTS required_documents_status_check;
+ALTER TABLE required_documents ADD CONSTRAINT required_documents_status_check
+  CHECK (status IN ('not_started','in_progress','submitted','revising','not_applicable'));
 
--- チェックリスト項目カタログ（区分①〜⑦、データ駆動＝画面から文言修正・追加削除できる）
+-- チェックリスト項目カタログ（区分①〜⑦、データ駆動＝コード側のCATEGORIES定義から起動時に同期される）
 CREATE TABLE IF NOT EXISTS checklist_categories (
   id          SERIAL PRIMARY KEY,
   sort_order  INT NOT NULL,
@@ -76,32 +76,33 @@ CREATE TABLE IF NOT EXISTS checklist_items (
   category_id  INT NOT NULL REFERENCES checklist_categories(id) ON DELETE CASCADE,
   sort_order   INT NOT NULL,
   text         TEXT NOT NULL,
-  note         TEXT             -- 補足（例:「下請契約がある場合のみ」）
+  note         TEXT,            -- 補足（例:「下請契約がある場合のみ」）
+  description  TEXT             -- どんな書類・作業かの平易な説明（素人向け）
 );
+ALTER TABLE checklist_items ADD COLUMN IF NOT EXISTS description TEXT;
 
 -- 案件ごとのチェック状況
 CREATE TABLE IF NOT EXISTS checklist_status (
-  project_id  INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  item_id     INT NOT NULL REFERENCES checklist_items(id) ON DELETE CASCADE,
-  checked     BOOLEAN NOT NULL DEFAULT false,  -- 旧カラム（互換用に残置。新規コードはstatusを参照）
-  status      TEXT NOT NULL DEFAULT 'not_started'
-              CHECK (status IN ('not_started','in_progress','submitted','revising')),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_by  INT REFERENCES users(id),
+  project_id   INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  item_id      INT NOT NULL REFERENCES checklist_items(id) ON DELETE CASCADE,
+  checked      BOOLEAN NOT NULL DEFAULT false,  -- 旧カラム（互換用に残置。新規コードはstatusを参照）
+  status       TEXT NOT NULL DEFAULT 'not_started',
+  link_url     TEXT,            -- 共有サーバー上のこの項目の保存先へのリンク
+  due_date     DATE,            -- 提出期限
+  status_note  TEXT,            -- status='not_applicable'の場合の根拠等のメモ
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by   INT REFERENCES users(id),
   PRIMARY KEY (project_id, item_id)
 );
 ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'not_started';
-DO $$ BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.constraint_column_usage
-    WHERE table_name = 'checklist_status' AND constraint_name = 'checklist_status_status_check'
-  ) THEN
-    ALTER TABLE checklist_status ADD CONSTRAINT checklist_status_status_check
-      CHECK (status IN ('not_started','in_progress','submitted','revising'));
-  END IF;
-END $$;
+ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS link_url TEXT;
+ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS due_date DATE;
+ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS status_note TEXT;
+ALTER TABLE checklist_status DROP CONSTRAINT IF EXISTS checklist_status_status_check;
+ALTER TABLE checklist_status ADD CONSTRAINT checklist_status_status_check
+  CHECK (status IN ('not_started','in_progress','submitted','revising','not_applicable'));
 
--- 一度きりのデータ移行（旧checked/obtainedのbool値をstatusへ反映）を記録するテーブル
+-- 一度きりのデータ移行を記録するテーブル（旧checked/obtainedのbool値→statusへの反映など）
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version     TEXT PRIMARY KEY,
   applied_at  TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -119,3 +120,5 @@ CREATE TABLE IF NOT EXISTS activity_log (
 
 CREATE INDEX IF NOT EXISTS idx_activity_log_project ON activity_log(project_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_technicians_dates ON project_technicians(start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_checklist_status_due ON checklist_status(due_date);
+CREATE INDEX IF NOT EXISTS idx_required_documents_due ON required_documents(due_date);

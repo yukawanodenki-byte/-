@@ -11,6 +11,13 @@
     <input type="text" name="contract_amount" placeholder="例: 12,000,000円（税込）">
     <label>工期</label>
     <input type="text" name="period_text" placeholder="例: 2026/09/01 〜 2027/02/28">
+    <label>作成担当者</label>
+    <select name="assignee_user_id">
+      <option value="">未設定</option>
+      <% users.forEach(function (u) { %>
+        <option value="<%= u.id %>"><%= u.display_name %></option>
+      <% }) %>
+    </select>
     <div style="margin-top:16px;">
       <button class="btn" type="submit">作成</button>
       <a class="btn secondary" href="/">キャンセル</a>

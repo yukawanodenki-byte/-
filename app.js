@@ -26,48 +26,66 @@
     return res;
   }
 
+  const STATUS_CLASSES = ['status-not_started', 'status-in_progress', 'status-submitted', 'status-revising', 'status-not_applicable'];
   function applyStatusClass(selectEl) {
-    selectEl.classList.remove('status-not_started', 'status-in_progress', 'status-submitted', 'status-revising');
+    selectEl.classList.remove(...STATUS_CLASSES);
     selectEl.classList.add('status-' + selectEl.value);
   }
 
   document.querySelectorAll('.status-select').forEach((el) => applyStatusClass(el));
 
-  document.querySelectorAll('.item-status').forEach((el) => {
-    el.addEventListener('change', () => {
-      applyStatusClass(el);
-      const projectId = el.dataset.project;
-      const itemId = el.dataset.item;
-      postJSON(`/api/projects/${projectId}/items/${itemId}/status`, { status: el.value });
-    });
-  });
+  // ---- 必須書類／チェックリスト項目 共通（field-row）----
+  function endpointBase(row) {
+    const kind = row.dataset.kind;
+    const projectId = row.dataset.project;
+    const ref = row.dataset.ref;
+    return kind === 'doc'
+      ? `/api/projects/${projectId}/documents/${encodeURIComponent(ref)}`
+      : `/api/projects/${projectId}/items/${ref}`;
+  }
 
-  document.querySelectorAll('.doc-status').forEach((el) => {
-    el.addEventListener('change', () => {
-      applyStatusClass(el);
-      const projectId = el.dataset.project;
-      const key = el.dataset.key;
-      postJSON(`/api/projects/${projectId}/documents/${key}/status`, { status: el.value });
-    });
-  });
+  document.querySelectorAll('.field-row').forEach((row) => {
+    const base = endpointBase(row);
+    const statusSel = row.querySelector('.field-status');
+    const dueInput = row.querySelector('.field-due');
+    const linkInput = row.querySelector('.field-link');
+    const openBtn = row.querySelector('.field-open-link');
+    const noteWrap = row.querySelector('.field-note-wrap');
+    const noteInput = row.querySelector('.field-note');
 
-  document.querySelectorAll('.doc-link').forEach((el) => {
-    el.addEventListener('change', () => {
-      const projectId = el.dataset.project;
-      const key = el.dataset.key;
-      const openBtn = el.parentElement.querySelector('.doc-open-link');
-      if (openBtn) {
-        if (el.value.trim()) {
-          openBtn.href = el.value.trim();
-          openBtn.style.visibility = 'visible';
-        } else {
-          openBtn.style.visibility = 'hidden';
+    if (statusSel) {
+      statusSel.addEventListener('change', () => {
+        applyStatusClass(statusSel);
+        if (noteWrap) noteWrap.style.display = statusSel.value === 'not_applicable' ? '' : 'none';
+        postJSON(`${base}/status`, { status: statusSel.value });
+      });
+    }
+    if (dueInput) {
+      dueInput.addEventListener('change', () => {
+        postJSON(`${base}/due`, { due_date: dueInput.value });
+      });
+    }
+    if (linkInput) {
+      linkInput.addEventListener('change', () => {
+        if (openBtn) {
+          if (linkInput.value.trim()) {
+            openBtn.href = linkInput.value.trim();
+            openBtn.style.visibility = 'visible';
+          } else {
+            openBtn.style.visibility = 'hidden';
+          }
         }
-      }
-      postJSON(`/api/projects/${projectId}/documents/${key}/link`, { link_url: el.value });
-    });
+        postJSON(`${base}/link`, { link_url: linkInput.value });
+      });
+    }
+    if (noteInput) {
+      noteInput.addEventListener('change', () => {
+        postJSON(`${base}/note`, { status_note: noteInput.value });
+      });
+    }
   });
 
+  // ---- 体制・工程 ----
   document.querySelectorAll('.tech-col').forEach((col) => {
     const projectId = col.dataset.project;
     const role = col.dataset.role;

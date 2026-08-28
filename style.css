@@ -96,31 +96,56 @@ label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px
 .badge.red { background: #fee2e2; color: var(--red); }
 .badge.blue { background: #dbeafe; color: var(--blue); }
 .badge.amber { background: #fef3c7; color: var(--amber); }
+.badge.green { background: #dcfce7; color: var(--green); }
+.badge.purple { background: #ede9fe; color: #5b21b6; }
 
 .folder-link-row { margin-top: 8px; font-size: 12px; }
 .folder-link-row a { color: var(--accent); }
+
+.assignee { font-size: 12px; color: var(--muted); margin: 2px 0 10px; }
+
+.due-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+.due-badge.green { background: #dcfce7; color: #166534; }
+.due-badge.red { background: #fee2e2; color: #991b1b; }
 
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 13px; }
 th { color: var(--muted); font-weight: 600; }
 
-.checklist-category { margin-bottom: 18px; }
-.checklist-category h3 { font-size: 14px; margin: 0 0 8px; color: #374151; }
-.checklist-item-v2 { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 14px; }
-.checklist-item-v2 .note { color: var(--muted); font-size: 12px; margin-left: 6px; }
+.checklist-category { margin-bottom: 18px; border: 1px solid var(--border); border-radius: 8px; padding: 4px 12px 10px; }
+.checklist-category summary { cursor: pointer; font-size: 14px; font-weight: 600; color: #374151; padding: 8px 0; list-style: revert; }
+.checklist-category .cat-count { font-weight: 400; color: var(--muted); font-size: 12px; }
 
-/* ステータス4段階の共通スタイル（プロジェクト一覧・チェックリスト・必須書類で共通利用） */
-.status-select { width: auto; min-width: 96px; flex-shrink: 0; font-size: 13px; padding: 4px 8px; font-weight: 600; border-width: 1px; }
+/* ステータス5段階の共通スタイル（プロジェクト一覧・チェックリスト・必須書類で共通利用） */
+.status-select { width: auto; min-width: 88px; flex-shrink: 0; font-size: 13px; padding: 4px 8px; font-weight: 600; border-width: 1px; }
 .status-select.status-not_started { background: #f3f4f6; color: var(--muted); border-color: var(--border); }
 .status-select.status-in_progress { background: #fef3c7; color: #92400e; border-color: #fde68a; }
 .status-select.status-submitted { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
 .status-select.status-revising { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.status-select.status-not_applicable { background: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
 
-.doc-grid-v2 { display: flex; flex-direction: column; gap: 8px; }
-.doc-item-v2 { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; flex-wrap: wrap; }
-.doc-item-name { width: 160px; flex-shrink: 0; font-weight: 600; }
-.doc-item-v2 .doc-link { flex: 1; min-width: 180px; width: auto; }
-.doc-item-v2 .doc-open-link { flex-shrink: 0; padding: 6px 12px; font-size: 13px; }
+/* 必須書類・チェックリスト項目 共通の1行コンポーネント（field_row.ejs） */
+.field-row { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+.field-row-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.field-row-name { font-weight: 600; }
+.field-row-head .note { color: var(--muted); font-size: 12px; }
+.field-desc { color: var(--muted); font-size: 12px; margin: 6px 0 0; line-height: 1.5; }
+.field-row-controls { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.field-row-controls .mini-label { font-size: 11px; color: var(--muted); margin: 0; display: flex; flex-direction: column; gap: 3px; }
+.field-row-controls input[type=date] { width: 150px; }
+.field-row-controls input[type=text] { width: 240px; }
+.field-row-controls .field-open-link { padding: 6px 12px; font-size: 13px; }
+.field-note-wrap { margin-top: 8px; }
+.field-note-wrap .mini-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+.field-note-wrap textarea { width: 100%; font-family: inherit; }
+.field-meta { color: var(--muted); font-size: 11px; margin-top: 6px; }
+
+.precedent-box { margin-top: 8px; font-size: 12px; }
+.precedent-box summary { cursor: pointer; color: var(--accent); }
+.precedent-box ul { margin: 6px 0 0 18px; padding: 0; }
+.precedent-box li { margin-bottom: 3px; }
+
+.deadline-panel table { margin-top: 8px; }
 
 .tech-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .tech-col { border: 1px solid var(--border); border-radius: 8px; padding: 10px; }

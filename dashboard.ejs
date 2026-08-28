@@ -7,6 +7,29 @@
   </div>
 </div>
 
+<% if (upcomingDeadlines && upcomingDeadlines.length > 0) { %>
+  <div class="card deadline-panel">
+    <h2>⏰ 締切が近い項目（全案件横断・提出済み／対象外を除く）</h2>
+    <table>
+      <thead><tr><th>案件</th><th>項目</th><th>期限</th><th>状態</th></tr></thead>
+      <tbody>
+        <% upcomingDeadlines.slice(0, 20).forEach(d => { %>
+          <tr>
+            <td><a href="/projects/<%= d.projectId %>"><%= d.projectName %></a></td>
+            <td><%= d.label %></td>
+            <td>
+              <span class="due-badge due-<%= d.alert.level %>">
+                <%= new Date(d.dueDate).toLocaleDateString('ja-JP') %><% if (d.alert.daysRemaining < 0) { %>（期限超過）<% } %>
+              </span>
+            </td>
+            <td><%= STATUS_LABELS[d.status] || d.status %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
 <% if (summaries.length === 0) { %>
   <div class="card">まだ案件がありません。「＋ 案件を追加」から登録してください。</div>
 <% } %>
@@ -19,6 +42,7 @@
         <% if (s.overlapBadge) { %><span class="badge <%= s.overlapBadge %>">技術者重複</span><% } %>
       </div>
       <div class="agency"><%= s.project.agency || '発注機関未設定' %></div>
+      <div class="assignee">👤 <%= s.assigneeName || '担当未設定' %></div>
       <div class="stage"><%= s.currentStage %></div>
       <div class="progress-bar"><div style="width:<%= s.progress %>%"></div></div>
       <div class="meta-row">
@@ -26,12 +50,21 @@
           チェックリスト <%= s.doneItems %>/<%= s.totalItems %>
           <% if (s.revisingItems > 0) { %><span class="badge red">修正中 <%= s.revisingItems %></span><% } %>
           <% if (s.inProgressItems > 0) { %><span class="badge amber">作成中 <%= s.inProgressItems %></span><% } %>
+          <% if (s.naItems > 0) { %><span class="badge purple">対象外 <%= s.naItems %></span><% } %>
         </span>
         <span>
           必須書類 <%= s.docDoneCount %>/<%= s.docTotalCount %>
           <% if (s.docRevisingCount > 0) { %><span class="badge red">修正中 <%= s.docRevisingCount %></span><% } %>
         </span>
       </div>
+      <% if (s.dueRedCount > 0 || s.dueGreenCount > 0) { %>
+        <div class="meta-row">
+          <span>
+            <% if (s.dueRedCount > 0) { %><span class="badge red">締切間近 <%= s.dueRedCount %></span><% } %>
+            <% if (s.dueGreenCount > 0) { %><span class="badge green">締切接近 <%= s.dueGreenCount %></span><% } %>
+          </span>
+        </div>
+      <% } %>
       <% if (s.project.folder_url) { %>
         <div class="folder-link-row">
           <a href="<%= s.project.folder_url %>" target="_blank" rel="noopener" onclick="event.stopPropagation()">📁 共有フォルダを開く</a>

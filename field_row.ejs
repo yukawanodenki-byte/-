@@ -1,0 +1,51 @@
+<%
+  // 汎用の1行コンポーネント。必須書類（kind='doc'）とチェックリスト項目（kind='item'）の
+  // どちらからも同じ見た目・同じJSで動かすための共通パーツ。
+  const row = statusRow || { status: 'not_started' };
+  const due = row.due_date ? row.due_date.toISOString().slice(0, 10) : '';
+  const alertLevel = row.alertLevel || 'none';
+%>
+<div class="field-row" data-kind="<%= kind %>" data-project="<%= projectId %>" data-ref="<%= ref %>">
+  <div class="field-row-head">
+    <select class="status-select field-status">
+      <% STATUS_VALUES.forEach(function (sv) { %>
+        <option value="<%= sv %>" <%= row.status === sv ? 'selected' : '' %>><%= STATUS_LABELS[sv] %></option>
+      <% }) %>
+    </select>
+    <span class="field-row-name"><%= label %></span>
+    <% if (note) { %><span class="note">（<%= note %>）</span><% } %>
+    <% if (alertLevel !== 'none') { %>
+      <span class="due-badge due-<%= alertLevel %>">
+        <%= row.daysRemaining < 0 ? '期限超過' : (alertLevel === 'red' ? '提出間近' : 'まもなく期限') %>
+      </span>
+    <% } %>
+  </div>
+  <% if (description) { %><div class="field-desc"><%= description %></div><% } %>
+  <div class="field-row-controls">
+    <label class="mini-label">期限
+      <input type="date" class="field-due" value="<%= due %>">
+    </label>
+    <label class="mini-label">保存先リンク
+      <input type="text" class="field-link" value="<%= row.link_url || '' %>" placeholder="共有サーバー上の保存先">
+    </label>
+    <a class="btn secondary field-open-link" href="<%= row.link_url || '#' %>" target="_blank" rel="noopener"
+      style="<%= row.link_url ? '' : 'visibility:hidden' %>">開く</a>
+  </div>
+  <div class="field-note-wrap" style="<%= row.status === 'not_applicable' ? '' : 'display:none' %>">
+    <label class="mini-label">対象外とする根拠</label>
+    <textarea class="field-note" rows="2" placeholder="例: 下請契約が無いため不要"><%= row.status_note || '' %></textarea>
+  </div>
+  <% if (row.updated_at) { %>
+    <div class="field-meta">最終更新: <%= new Date(row.updated_at).toLocaleString('ja-JP') %> — <%= row.updated_by_name || '不明' %></div>
+  <% } %>
+  <% if (precedents && precedents.length > 0) { %>
+    <details class="precedent-box">
+      <summary>📋 同系統発注機関での提出実績（<%= precedents.length %>件）</summary>
+      <ul>
+        <% precedents.forEach(function (pr) { %>
+          <li><a href="/projects/<%= pr.projectId %>" target="_blank"><%= pr.projectName %></a> — <%= pr.updatedByName %>（<%= new Date(pr.updatedAt).toLocaleDateString('ja-JP') %>）</li>
+        <% }) %>
+      </ul>
+    </details>
+  <% } %>
+</div>
