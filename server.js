@@ -368,6 +368,8 @@ const PORT = process.env.PORT || 3000;
 
 async function start() {
   await initSchema();
+  const { seedIfEmpty } = require('./seed');
+  await seedIfEmpty(); // チェックリストカタログ・初期ユーザーが空なら投入（既に投入済みなら何もしない）
   app.listen(PORT, () => console.log(`koji-checklist listening on :${PORT}`));
 }
 

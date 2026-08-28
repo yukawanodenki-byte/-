@@ -96,7 +96,7 @@ const CATEGORIES = [
   },
 ];
 
-async function main() {
+async function seedIfEmpty() {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -148,11 +148,17 @@ async function main() {
     throw e;
   } finally {
     client.release();
-    await pool.end();
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+module.exports = { seedIfEmpty };
+
+// `node seed.js` で直接実行された場合のみCLIとして動く（server.jsからrequireされた時は実行しない）
+if (require.main === module) {
+  seedIfEmpty()
+    .then(() => pool.end())
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    });
+}
