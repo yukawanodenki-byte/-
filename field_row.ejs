@@ -19,14 +19,17 @@
         <%= row.daysRemaining < 0 ? '期限超過' : (alertLevel === 'red' ? '提出間近' : 'まもなく期限') %>
       </span>
     <% } %>
+    <% if (typeof extraLink !== 'undefined' && extraLink) { %>
+      <a class="btn secondary" href="<%= extraLink.href %>" target="_blank" rel="noopener"><%= extraLink.label %></a>
+    <% } %>
   </div>
   <% if (description) { %><div class="field-desc"><%= description %></div><% } %>
   <div class="field-row-controls">
     <label class="mini-label">期限
       <input type="date" class="field-due" value="<%= due %>">
     </label>
-    <label class="mini-label">保存先リンク
-      <input type="text" class="field-link" value="<%= row.link_url || '' %>" placeholder="共有サーバー上の保存先">
+    <label class="mini-label">保存先リンク（ドラッグ＆ドロップ可）
+      <input type="text" class="field-link dropzone" value="<%= row.link_url || '' %>" placeholder="共有サーバー上の保存先 or ファイル/フォルダをドラッグ">
     </label>
     <a class="btn secondary field-open-link" href="<%= row.link_url || '#' %>" target="_blank" rel="noopener"
       style="<%= row.link_url ? '' : 'visibility:hidden' %>">開く</a>
@@ -35,6 +38,20 @@
     <label class="mini-label">対象外とする根拠</label>
     <textarea class="field-note" rows="2" placeholder="例: 下請契約が無いため不要"><%= row.status_note || '' %></textarea>
   </div>
+  <details class="contractor-box" <%= row.contractor_name ? 'open' : '' %>>
+    <summary>🏗 協力業者への依頼<% if (row.contractor_name) { %>（<%= row.contractor_name %>）<% } %></summary>
+    <div class="contractor-fields">
+      <label class="mini-label">協力業者名
+        <input type="text" class="contractor-name" value="<%= row.contractor_name || '' %>" placeholder="例: 〇〇電設">
+      </label>
+      <label class="mini-label">依頼日
+        <input type="date" class="contractor-date" value="<%= row.requested_at ? row.requested_at.toISOString().slice(0,10) : '' %>">
+      </label>
+      <label class="mini-label">依頼内容（いつ・何を依頼したか）
+        <textarea class="contractor-detail" rows="2" placeholder="例: 8/28に電話で施工体制台帳の作成を依頼、9/5納品予定"><%= row.request_detail || '' %></textarea>
+      </label>
+    </div>
+  </details>
   <% if (row.updated_at) { %>
     <div class="field-meta">最終更新: <%= new Date(row.updated_at).toLocaleString('ja-JP') %> — <%= row.updated_by_name || '不明' %></div>
   <% } %>

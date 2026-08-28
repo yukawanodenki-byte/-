@@ -334,6 +334,7 @@ async function computeProjectSummaries() {
       assigneeName: p.assignee_user_id ? (userNameById[p.assignee_user_id] || '不明') : null,
       dueRedCount,
       dueGreenCount,
+      scheduleMissing: !p.construction_start_date || !p.construction_end_date,
     };
   });
 
@@ -373,15 +374,111 @@ app.get('/', requireAuth, async (req, res) => {
   res.render('dashboard', { summaries, upcomingDeadlines, STATUS_LABELS });
 });
 
+// ---- 年間工程表（契約期間ベース：準備期間／着工／完工が一目でわかる） ----
+// 表示範囲は「発注機関の年度」等を仮定せず、実際に登録されている案件データ（契約日〜完成期日）から
+// 機械的に算出する（誤った年度の思い込みでズレるのを避けるため）。範囲は月初〜月末に丸めて見やすくする。
+async function computeAnnualSchedule() {
+  const { rows: projects } = await pool.query(
+    `SELECT id, name, agency, contract_date, construction_start_date, construction_end_date, assignee_user_id
+     FROM projects WHERE archived = false ORDER BY construction_start_date ASC NULLS LAST, created_at ASC`
+  );
+  const { rows: users } = await pool.query('SELECT id, display_name FROM users');
+  const userNameById = {};
+  users.forEach((u) => { userNameById[u.id] = u.display_name; });
+
+  const withDates = projects.filter((p) => p.construction_start_date && p.construction_end_date);
+  const today = new Date();
+  let rangeStart = null;
+  let rangeEnd = null;
+  withDates.forEach((p) => {
+    const s = p.contract_date || p.construction_start_date;
+    const e = p.construction_end_date;
+    if (!rangeStart || s < rangeStart) rangeStart = s;
+    if (!rangeEnd || e > rangeEnd) rangeEnd = e;
+  });
+  if (!rangeStart) rangeStart = today;
+  if (!rangeEnd) rangeEnd = new Date(today.getTime() + 1000 * 60 * 60 * 24 * 180);
+  // 今日を含む範囲になるよう補正した上で、月初・月末へ丸める
+  if (today < rangeStart) rangeStart = today;
+  if (today > rangeEnd) rangeEnd = today;
+  rangeStart = new Date(Date.UTC(rangeStart.getUTCFullYear(), rangeStart.getUTCMonth(), 1));
+  rangeEnd = new Date(Date.UTC(rangeEnd.getUTCFullYear(), rangeEnd.getUTCMonth() + 1, 0));
+  const totalMs = rangeEnd - rangeStart || 1;
+
+  function pct(d) {
+    if (!d) return null;
+    const t = new Date(d);
+    return Math.max(0, Math.min(100, ((t - rangeStart) / totalMs) * 100));
+  }
+
+  const months = [];
+  let cur = new Date(rangeStart);
+  while (cur <= rangeEnd) {
+    months.push({ label: `${cur.getUTCFullYear()}/${cur.getUTCMonth() + 1}`, pct: pct(cur) });
+    cur = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth() + 1, 1));
+  }
+
+  const rows = projects.map((p) => {
+    const prepStartRaw = p.contract_date || p.construction_start_date;
+    return {
+      project: p,
+      assigneeName: p.assignee_user_id ? (userNameById[p.assignee_user_id] || '不明') : null,
+      missing: !p.construction_start_date || !p.construction_end_date,
+      prepStartPct: pct(prepStartRaw),
+      startPct: pct(p.construction_start_date),
+      endPct: pct(p.construction_end_date),
+    };
+  });
+
+  return { rows, months, todayPct: pct(today), rangeStart, rangeEnd };
+}
+
 app.get('/timeline', requireAuth, async (req, res) => {
-  const { rows: projects } = await pool.query('SELECT * FROM projects WHERE archived = false ORDER BY id');
+  const schedule = await computeAnnualSchedule();
   const { rows: techs } = await pool.query(
     `SELECT t.*, p.name AS project_name FROM project_technicians t
      JOIN projects p ON p.id = t.project_id
      WHERE t.start_date IS NOT NULL AND t.end_date IS NOT NULL
      ORDER BY t.start_date`
   );
-  res.render('timeline', { projects, techs });
+  res.render('timeline', { schedule, techs });
+});
+
+// ---- 書類テンプレート（雛形のプレビュー・ダウンロード） ----
+// 「必ずコピーしてから使用」の雛形ファイル。中身に案件固有の秘匿情報は含まないため、
+// Office Onlineビューアが取得できるよう /template-files/ はログイン無しで配信する。
+const TEMPLATE_FILES = [
+  {
+    key: 'uchiwakesho',
+    label: '工事費内訳書 雛形',
+    filename: 'template_uchiwakesho.xlsx',
+    description:
+      '見積・契約時に使用する工事費内訳書のひな形です。発注機関によって様式が変わるため、実際に使う際は必ず「コピーしてから」編集してください（この元ファイルを直接編集すると他の案件で使えなくなります）。',
+  },
+];
+
+app.get('/templates', requireAuth, (req, res) => {
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const templates = TEMPLATE_FILES.map((t) => {
+    const fileUrl = `/template-files/${t.filename}`;
+    return {
+      ...t,
+      fileUrl,
+      viewerUrl: `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(baseUrl + fileUrl)}`,
+    };
+  });
+  res.render('templates', { templates });
+});
+
+app.get('/template-files/:filename', (req, res) => {
+  const file = TEMPLATE_FILES.find((t) => t.filename === req.params.filename);
+  if (!file) return res.status(404).send('Not found');
+  res.sendFile(path.join(__dirname, file.filename));
+});
+
+// ---- 使い方マニュアル ----
+app.get('/manual', requireAuth, (req, res) => {
+  res.render('manual');
 });
 
 // ---- project create / import ----
@@ -519,11 +616,25 @@ app.get('/projects/:id', requireAuth, async (req, res) => {
 
 app.post('/projects/:id/info', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
-  const { name, agency, contract_amount, period_text, folder_url, assignee_user_id } = req.body;
+  const {
+    name, agency, contract_amount, period_text, folder_url, assignee_user_id,
+    contract_date, construction_start_date, construction_end_date,
+    contract_officer_name, contract_officer_phone,
+    supervisor_name, supervisor_phone, mailing_address,
+  } = req.body;
   await pool.query(
     `UPDATE projects SET name=$1, agency=$2, contract_amount=$3, period_text=$4, folder_url=$5,
-       assignee_user_id=$6, updated_at=now(), updated_by=$7 WHERE id=$8`,
-    [name, agency, contract_amount, period_text, folder_url || null, assignee_user_id ? Number(assignee_user_id) : null, req.session.userId, projectId]
+       assignee_user_id=$6, contract_date=$7, construction_start_date=$8, construction_end_date=$9,
+       contract_officer_name=$10, contract_officer_phone=$11, supervisor_name=$12, supervisor_phone=$13,
+       mailing_address=$14, updated_at=now(), updated_by=$15 WHERE id=$16`,
+    [
+      name, agency, contract_amount, period_text, folder_url || null,
+      assignee_user_id ? Number(assignee_user_id) : null,
+      contract_date || null, construction_start_date || null, construction_end_date || null,
+      contract_officer_name || null, contract_officer_phone || null,
+      supervisor_name || null, supervisor_phone || null, mailing_address || null,
+      req.session.userId, projectId,
+    ]
   );
   await logActivity(projectId, req.session.userId, 'update_info', '基本情報を更新');
   res.redirect('/projects/' + projectId);
@@ -590,6 +701,22 @@ app.post('/api/projects/:id/items/:itemId/note', requireAuth, async (req, res) =
   res.json({ ok: true });
 });
 
+app.post('/api/projects/:id/items/:itemId/contractor', requireAuth, async (req, res) => {
+  const projectId = Number(req.params.id);
+  const itemId = Number(req.params.itemId);
+  const contractorName = (req.body.contractor_name || '').trim() || null;
+  const requestedAt = (req.body.requested_at || '').trim() || null;
+  const requestDetail = (req.body.request_detail || '').trim() || null;
+  await pool.query(
+    `INSERT INTO checklist_status (project_id, item_id, contractor_name, requested_at, request_detail, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6, now())
+     ON CONFLICT (project_id, item_id) DO UPDATE SET
+       contractor_name=$3, requested_at=$4, request_detail=$5, updated_by=$6, updated_at=now()`,
+    [projectId, itemId, contractorName, requestedAt, requestDetail, req.session.userId]
+  );
+  res.json({ ok: true });
+});
+
 // ---- ajax: required document ----
 app.post('/api/projects/:id/documents/:docKey/status', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
@@ -640,6 +767,22 @@ app.post('/api/projects/:id/documents/:docKey/note', requireAuth, async (req, re
      VALUES ($1,$2,$3,$4, now())
      ON CONFLICT (project_id, doc_key) DO UPDATE SET status_note = $3, updated_by = $4, updated_at = now()`,
     [projectId, docKey, statusNote, req.session.userId]
+  );
+  res.json({ ok: true });
+});
+
+app.post('/api/projects/:id/documents/:docKey/contractor', requireAuth, async (req, res) => {
+  const projectId = Number(req.params.id);
+  const docKey = req.params.docKey;
+  const contractorName = (req.body.contractor_name || '').trim() || null;
+  const requestedAt = (req.body.requested_at || '').trim() || null;
+  const requestDetail = (req.body.request_detail || '').trim() || null;
+  await pool.query(
+    `INSERT INTO required_documents (project_id, doc_key, contractor_name, requested_at, request_detail, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6, now())
+     ON CONFLICT (project_id, doc_key) DO UPDATE SET
+       contractor_name=$3, requested_at=$4, request_detail=$5, updated_by=$6, updated_at=now()`,
+    [projectId, docKey, contractorName, requestedAt, requestDetail, req.session.userId]
   );
   res.json({ ok: true });
 });

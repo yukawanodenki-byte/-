@@ -27,6 +27,16 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS folder_url TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS assignee_user_id INT REFERENCES users(id);
+-- 年間工程表（契約期間ベース）用。準備期間はcontract_date（無ければconstruction_start_date）〜construction_start_dateとして計算する。
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS contract_date DATE;              -- 契約日
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS construction_start_date DATE;    -- 着工日
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS construction_end_date DATE;      -- 完成期日（完工日）
+-- 発注機関側の連絡先（基本情報）
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS contract_officer_name TEXT;      -- 契約担当者の氏名
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS contract_officer_phone TEXT;     -- 契約担当者の電話番号
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS supervisor_name TEXT;           -- 監督職員の氏名
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS supervisor_phone TEXT;          -- 監督職員の電話番号
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS mailing_address TEXT;           -- 郵送物の送り先
 
 -- 体制・工程（監理技術者／主任技術者／現場代理人）。1案件につき役割ごとに1行。
 CREATE TABLE IF NOT EXISTS project_technicians (
@@ -60,6 +70,10 @@ ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEF
 ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS link_url TEXT;
 ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS due_date DATE;
 ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS status_note TEXT;
+-- 協力業者（外注）へ作成を依頼した場合の記録
+ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS contractor_name TEXT;   -- 依頼先の協力業者名
+ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS requested_at DATE;      -- 依頼日
+ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS request_detail TEXT;    -- いつどんな依頼をしたか（自由記述）
 ALTER TABLE required_documents DROP CONSTRAINT IF EXISTS required_documents_status_check;
 ALTER TABLE required_documents ADD CONSTRAINT required_documents_status_check
   CHECK (status IN ('not_started','in_progress','submitted','revising','not_applicable'));
@@ -98,6 +112,10 @@ ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAU
 ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS link_url TEXT;
 ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS due_date DATE;
 ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS status_note TEXT;
+-- 協力業者（外注）へ作成を依頼した場合の記録
+ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS contractor_name TEXT;
+ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS requested_at DATE;
+ALTER TABLE checklist_status ADD COLUMN IF NOT EXISTS request_detail TEXT;
 ALTER TABLE checklist_status DROP CONSTRAINT IF EXISTS checklist_status_status_check;
 ALTER TABLE checklist_status ADD CONSTRAINT checklist_status_status_check
   CHECK (status IN ('not_started','in_progress','submitted','revising','not_applicable'));
@@ -122,3 +140,4 @@ CREATE INDEX IF NOT EXISTS idx_activity_log_project ON activity_log(project_id, 
 CREATE INDEX IF NOT EXISTS idx_technicians_dates ON project_technicians(start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_checklist_status_due ON checklist_status(due_date);
 CREATE INDEX IF NOT EXISTS idx_required_documents_due ON required_documents(due_date);
+CREATE INDEX IF NOT EXISTS idx_projects_construction_dates ON projects(construction_start_date, construction_end_date);

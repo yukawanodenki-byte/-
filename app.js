@@ -83,6 +83,49 @@
         postJSON(`${base}/note`, { status_note: noteInput.value });
       });
     }
+
+    // ---- 協力業者への依頼 ----
+    const contractorName = row.querySelector('.contractor-name');
+    const contractorDate = row.querySelector('.contractor-date');
+    const contractorDetail = row.querySelector('.contractor-detail');
+    function saveContractor() {
+      postJSON(`${base}/contractor`, {
+        contractor_name: contractorName ? contractorName.value : '',
+        requested_at: contractorDate ? contractorDate.value : '',
+        request_detail: contractorDetail ? contractorDetail.value : '',
+      });
+    }
+    if (contractorName) contractorName.addEventListener('change', saveContractor);
+    if (contractorDate) contractorDate.addEventListener('change', saveContractor);
+    if (contractorDetail) contractorDetail.addEventListener('change', saveContractor);
+  });
+
+  // ---- 保存先リンク欄のドラッグ＆ドロップ ----
+  // ブラウザの仕様上、ドロップされたファイル/フォルダの完全なパス（\\server\...等）は取得できないため、
+  // ファイル名・フォルダ名だけを自動入力する（完全なパスは手入力での補完が必要）。
+  document.querySelectorAll('.dropzone').forEach((el) => {
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      let name = '';
+      if (e.dataTransfer.items && e.dataTransfer.items.length) {
+        const item = e.dataTransfer.items[0];
+        const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+        if (entry) name = entry.name;
+      }
+      if (!name && e.dataTransfer.files && e.dataTransfer.files.length) {
+        name = e.dataTransfer.files[0].name;
+      }
+      if (name) {
+        el.value = el.value.trim() ? el.value : name;
+        el.dispatchEvent(new Event('change'));
+      }
+    });
   });
 
   // ---- 体制・工程 ----

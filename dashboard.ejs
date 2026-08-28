@@ -43,6 +43,13 @@
       </div>
       <div class="agency"><%= s.project.agency || '発注機関未設定' %></div>
       <div class="assignee">👤 <%= s.assigneeName || '担当未設定' %></div>
+      <div class="assignee">
+        <% if (s.scheduleMissing) { %>
+          <span class="badge red">⚠ 工期未設定</span>
+        <% } else { %>
+          🏗 着工 <%= s.project.construction_start_date.toISOString().slice(0,10) %> ／ 完工 <%= s.project.construction_end_date.toISOString().slice(0,10) %>
+        <% } %>
+      </div>
       <div class="stage"><%= s.currentStage %></div>
       <div class="progress-bar"><div style="width:<%= s.progress %>%"></div></div>
       <div class="meta-row">

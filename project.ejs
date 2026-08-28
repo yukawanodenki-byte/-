@@ -26,10 +26,51 @@
         <option value="<%= u.id %>" <%= project.assignee_user_id === u.id ? 'selected' : '' %>><%= u.display_name %></option>
       <% }) %>
     </select>
-    <label>共有フォルダのリンク</label>
-    <input type="text" name="folder_url" value="<%= project.folder_url || '' %>" placeholder="例: \\server\projects\〇〇工事 または https://...">
-    <p class="helptext">全員が使っている共有サーバー上のこの案件のフォルダへのリンクです。保存すると案件一覧・このページ上部からすぐ開けます。書類ごとの保存先リンクは下の各行で個別に設定できます。</p>
-    <div style="margin-top:12px;">
+    <label>共有フォルダのリンク（ドラッグ＆ドロップ可）</label>
+    <input type="text" name="folder_url" class="dropzone" value="<%= project.folder_url || '' %>" placeholder="例: \\server\projects\〇〇工事 または https://... 、ファイル/フォルダをドラッグしても入力できます">
+    <p class="helptext">全員が使っている共有サーバー上のこの案件のフォルダへのリンクです。保存すると案件一覧・このページ上部からすぐ開けます。書類ごとの保存先リンクは下の各行で個別に設定できます。
+      ※ ドラッグ＆ドロップはブラウザの仕様上、ファイル名・フォルダ名のみ自動入力されます。完全な保存先（\\server\...等）は自動入力後に手で補ってください。</p>
+
+    <h3 style="font-size:14px;margin:20px 0 4px;">年間工程表用（契約期間）</h3>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+      <div>
+        <label>契約日</label>
+        <input type="date" name="contract_date" value="<%= project.contract_date ? project.contract_date.toISOString().slice(0,10) : '' %>">
+      </div>
+      <div>
+        <label>着工日</label>
+        <input type="date" name="construction_start_date" value="<%= project.construction_start_date ? project.construction_start_date.toISOString().slice(0,10) : '' %>">
+      </div>
+      <div>
+        <label>完成期日（完工日）</label>
+        <input type="date" name="construction_end_date" value="<%= project.construction_end_date ? project.construction_end_date.toISOString().slice(0,10) : '' %>">
+      </div>
+    </div>
+    <p class="helptext">この3つの日付が「<a href="/timeline">年間工程表</a>」に反映されます。契約日〜着工日が「準備期間」、着工日〜完成期日が「施工期間」として表示されます。<strong>未入力のままだと年間工程表に「期間未設定」の警告が出ます。</strong>間違えないよう、必ず契約書・工事着手届等の原本の日付で入力してください。</p>
+
+    <h3 style="font-size:14px;margin:20px 0 4px;">発注機関の連絡先（基本情報）</h3>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
+      <div>
+        <label>契約担当者 氏名</label>
+        <input type="text" name="contract_officer_name" value="<%= project.contract_officer_name || '' %>" placeholder="発注機関側・契約担当の氏名">
+      </div>
+      <div>
+        <label>契約担当者 電話番号</label>
+        <input type="text" name="contract_officer_phone" value="<%= project.contract_officer_phone || '' %>">
+      </div>
+      <div>
+        <label>監督職員 氏名</label>
+        <input type="text" name="supervisor_name" value="<%= project.supervisor_name || '' %>" placeholder="現場を監督する発注機関側の担当者">
+      </div>
+      <div>
+        <label>監督職員 電話番号</label>
+        <input type="text" name="supervisor_phone" value="<%= project.supervisor_phone || '' %>">
+      </div>
+    </div>
+    <label>郵送物の送り先</label>
+    <textarea name="mailing_address" rows="2" placeholder="書類等を郵送する際の宛先住所・部署名"><%= project.mailing_address || '' %></textarea>
+
+    <div style="margin-top:16px;">
       <button class="btn" type="submit">保存</button>
       <button class="btn secondary" type="submit" formaction="/projects/<%= project.id %>/archive"
         onclick="return confirm('この案件をアーカイブしますか？一覧から非表示になります。')">アーカイブ</button>
@@ -88,6 +129,7 @@
       description: REQUIRED_DOC_DESCRIPTIONS[key],
       statusRow: row, precedents: precedentList,
       STATUS_VALUES: STATUS_VALUES, STATUS_LABELS: STATUS_LABELS,
+      extraLink: key === 'uchiwakesho' ? { href: '/templates', label: '📄 雛形をプレビュー' } : null,
     }) %>
   <% }) %>
   <p class="helptext">ステータスは「未着手／作成中／提出済み／修正中／対象外」の5段階です。提出の必要がない書類は「対象外」を選び、根拠欄に理由を記入してください。リンク欄には共有サーバー上の保存先（フォルダ/ファイルのパスやURL）を入力してください。ファイルそのものはこの画面には保存されません。</p>

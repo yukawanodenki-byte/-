@@ -145,7 +145,42 @@ th { color: var(--muted); font-weight: 600; }
 .precedent-box ul { margin: 6px 0 0 18px; padding: 0; }
 .precedent-box li { margin-bottom: 3px; }
 
+.contractor-box { margin-top: 8px; font-size: 12px; border-top: 1px dashed var(--border); padding-top: 6px; }
+.contractor-box summary { cursor: pointer; color: #92400e; font-weight: 600; }
+.contractor-fields { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+.contractor-fields .mini-label { font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.contractor-fields input[type=text] { width: 180px; }
+.contractor-fields input[type=date] { width: 150px; }
+.contractor-fields textarea { width: 280px; font-family: inherit; }
+
+.dropzone.drag-over { border-color: var(--accent) !important; background: #eff6ff; }
+
 .deadline-panel table { margin-top: 8px; }
+
+/* 年間工程表 */
+.schedule-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-bottom: 14px; flex-wrap: wrap; }
+.legend-swatch { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+.legend-swatch.prep { background: #d1d5db; }
+.legend-swatch.build { background: var(--accent); }
+.legend-swatch.today { background: var(--red); width: 2px; height: 14px; }
+
+.schedule-scroll { overflow-x: auto; }
+.schedule-chart { min-width: 900px; }
+.schedule-months { display: flex; border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 6px; }
+.schedule-months-spacer { width: 220px; flex-shrink: 0; }
+.schedule-months-track { position: relative; flex: 1; height: 20px; }
+.schedule-month-tick { position: absolute; top: 0; font-size: 11px; color: var(--muted); border-left: 1px solid var(--border); padding-left: 4px; height: 100%; }
+
+.schedule-row { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.schedule-row-label { width: 220px; flex-shrink: 0; padding-right: 8px; }
+.schedule-row-label .note { color: var(--muted); font-size: 11px; display: block; }
+.schedule-row-track { position: relative; flex: 1; height: 26px; background: #f8fafc; border-radius: 4px; }
+.schedule-bar { position: absolute; top: 4px; height: 18px; border-radius: 4px; }
+.schedule-bar.prep { background: #d1d5db; }
+.schedule-bar.build { background: var(--accent); }
+.schedule-bar-dates { position: absolute; left: 100%; top: 0; margin-left: 8px; white-space: nowrap; font-size: 11px; color: var(--text); }
+.schedule-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red); z-index: 2; }
+.schedule-missing { color: var(--red); font-size: 12px; padding: 4px 0; }
 
 .tech-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .tech-col { border: 1px solid var(--border); border-radius: 8px; padding: 10px; }

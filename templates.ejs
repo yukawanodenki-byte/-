@@ -1,0 +1,22 @@
+<%- include('header', { title: '書類テンプレート' }) %>
+<h1>書類テンプレート</h1>
+<p class="helptext">ここにある雛形は必ず「コピーしてから」使用してください。元のファイルを直接編集すると、他の案件で使うときに困ります。プレビューはMicrosoft Office Onlineの画面上で開くだけなので、内容の確認だけならダウンロード不要です。</p>
+
+<div class="project-grid">
+  <% templates.forEach(t => { %>
+    <div class="card">
+      <h2><%= t.label %></h2>
+      <p class="field-desc"><%= t.description %></p>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <a class="btn" href="<%= t.viewerUrl %>" target="_blank" rel="noopener">👁 プレビュー</a>
+        <a class="btn secondary" href="<%= t.fileUrl %>" download>⬇ ダウンロード</a>
+      </div>
+    </div>
+  <% }) %>
+</div>
+
+<div class="card">
+  <h2>今後追加予定</h2>
+  <p class="helptext">契約書・見積書などの雛形も、必要なファイルを教えていただければ順次ここに追加していきます。将来的には仕様書から内容を読み取って自動作成するところまで対応予定です（現在は雛形のプレビューのみ）。</p>
+</div>
+<%- include('footer') %>
