@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: koji-checklist
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: koji-checklist-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: SEED_ADMIN_USERNAME
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_ADMIN_DISPLAY_NAME
+        sync: false
+
+databases:
+  - name: koji-checklist-db
+    plan: basic-256mb

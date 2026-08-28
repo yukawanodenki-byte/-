@@ -1,0 +1,32 @@
+<%- include('partials/header', { title: 'メンバー管理' }) %>
+<h1>メンバー管理</h1>
+<p class="helptext">全メンバーが同じ権限でチェックリストを編集できます。担当ごとにアカウントを分けると、誰がいつ更新したかが履歴に残ります。</p>
+
+<div class="card">
+  <h2>メンバー一覧</h2>
+  <table>
+    <thead><tr><th>ユーザー名</th><th>表示名</th><th>登録日</th></tr></thead>
+    <tbody>
+      <% users.forEach(u => { %>
+        <tr><td><%= u.username %></td><td><%= u.display_name %></td><td><%= new Date(u.created_at).toLocaleDateString('ja-JP') %></td></tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<div class="card" style="max-width:420px;">
+  <h2>メンバーを追加</h2>
+  <% if (error) { %><div class="error"><%= error %></div><% } %>
+  <form method="post" action="/users">
+    <label>ユーザー名（ログインID）*</label>
+    <input type="text" name="username" required>
+    <label>表示名</label>
+    <input type="text" name="display_name">
+    <label>初期パスワード *</label>
+    <input type="text" name="password" required>
+    <div style="margin-top:14px;">
+      <button class="btn" type="submit">追加</button>
+    </div>
+  </form>
+</div>
+<%- include('partials/footer') %>

@@ -1,0 +1,23 @@
+<%- include('partials/header', { title: '貼り付けインポート' }) %>
+<h1>貼り付けインポート</h1>
+<div class="card">
+  <p class="helptext">
+    公告文書などをClaudeに読み取らせ、「案件名: 〇〇」のような行形式のテキストを書き出してもらい、それをここに貼り付けると新規案件として一括登録できます。<br>
+    案件ごとに空行で区切ってください（複数案件をまとめて貼り付け可能）。使えるラベル: 案件名 / 発注機関 / 契約金額 / 工期
+  </p>
+  <% if (error) { %><div class="error"><%= error %></div><% } %>
+  <form method="post" action="/import">
+    <textarea name="text" rows="10" placeholder="案件名: 〇〇工事&#10;発注機関: 〇〇地方整備局&#10;契約金額: 12,000,000円&#10;工期: 2026/09/01〜2027/02/28"></textarea>
+    <div style="margin-top:12px;">
+      <button class="btn" type="submit">インポート実行</button>
+    </div>
+  </form>
+  <% if (result) { %>
+    <div style="margin-top:16px;">
+      <strong><%= result.length %>件</strong> の案件を作成しました：
+      <ul><% result.forEach(n => { %><li><%= n %></li><% }) %></ul>
+      <a class="btn" href="/">案件一覧へ</a>
+    </div>
+  <% } %>
+</div>
+<%- include('partials/footer') %>

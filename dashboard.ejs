@@ -1,0 +1,31 @@
+<%- include('partials/header', { title: '案件一覧' }) %>
+<div style="display:flex;justify-content:space-between;align-items:center;">
+  <h1>案件一覧</h1>
+  <div>
+    <a class="btn secondary" href="/import">貼り付けインポート</a>
+    <a class="btn" href="/projects/new">＋ 案件を追加</a>
+  </div>
+</div>
+
+<% if (summaries.length === 0) { %>
+  <div class="card">まだ案件がありません。「＋ 案件を追加」から登録してください。</div>
+<% } %>
+
+<div class="project-grid">
+  <% summaries.forEach(s => { %>
+    <a class="project-card" href="/projects/<%= s.project.id %>">
+      <div class="name">
+        <%= s.project.name %>
+        <% if (s.overlapBadge) { %><span class="badge <%= s.overlapBadge %>">技術者重複</span><% } %>
+      </div>
+      <div class="agency"><%= s.project.agency || '発注機関未設定' %></div>
+      <div class="stage"><%= s.currentStage %></div>
+      <div class="progress-bar"><div style="width:<%= s.progress %>%"></div></div>
+      <div class="meta-row">
+        <span>チェックリスト <%= s.doneItems %>/<%= s.totalItems %></span>
+        <span>必須書類 <%= s.docDoneCount %>/<%= s.docTotalCount %></span>
+      </div>
+    </a>
+  <% }) %>
+</div>
+<%- include('partials/footer') %>

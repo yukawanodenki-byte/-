@@ -1,0 +1,55 @@
+<%
+  // 表示範囲: 全技術者の最小開始日〜最大終了日（データが無ければ今日から6ヶ月）
+  let minDate = null, maxDate = null;
+  techs.forEach(t => {
+    const s = new Date(t.start_date), e = new Date(t.end_date);
+    if (!minDate || s < minDate) minDate = s;
+    if (!maxDate || e > maxDate) maxDate = e;
+  });
+  if (!minDate) { minDate = new Date(); maxDate = new Date(Date.now() + 1000*60*60*24*180); }
+  const totalMs = maxDate - minDate || 1;
+
+  function pct(d) {
+    return Math.max(0, Math.min(100, ((new Date(d) - minDate) / totalMs) * 100));
+  }
+
+  // 重複判定（同一氏名・期間重複）
+  const overlapKeys = new Set();
+  const valid = techs.filter(t => t.person_name && !['×','-','ー',''].includes(t.person_name.trim()));
+  for (let i=0;i<valid.length;i++) {
+    for (let j=i+1;j<valid.length;j++) {
+      const a = valid[i], b = valid[j];
+      if (a.project_id === b.project_id) continue;
+      if (a.person_name.trim() !== b.person_name.trim()) continue;
+      const overlap = new Date(a.start_date) <= new Date(b.end_date) && new Date(b.start_date) <= new Date(a.end_date);
+      if (overlap) {
+        const sev = (a.exclusive || b.exclusive) ? 'red' : 'blue';
+        overlapKeys.add(a.id + ':' + sev);
+        overlapKeys.add(b.id + ':' + sev);
+      }
+    }
+  }
+  function barClass(t) {
+    if (overlapKeys.has(t.id + ':red')) return 'red';
+    if (overlapKeys.has(t.id + ':blue')) return 'blue';
+    return '';
+  }
+%>
+<%- include('partials/header', { title: '工程表' }) %>
+<h1>工程表（技術者配置）</h1>
+<p class="helptext">同一技術者が期間の重なる複数案件に配置されている場合、少なくとも一方が専任なら赤、両方とも非専任なら青で表示します。</p>
+
+<div class="card">
+  <% if (techs.length === 0) { %>
+    <p>期間が入力された技術者データがまだありません。各案件の「体制・工程」から開始日・終了日を入力してください。</p>
+  <% } %>
+  <% techs.forEach(t => { %>
+    <div class="timeline-row">
+      <div class="label"><%= t.project_name %> / <%= t.role %>（<%= t.person_name %>）</div>
+      <div class="timeline-bar-wrap">
+        <div class="timeline-bar <%= barClass(t) %>" style="left:<%= pct(t.start_date) %>%; width:<%= Math.max(1, pct(t.end_date) - pct(t.start_date)) %>%"></div>
+      </div>
+    </div>
+  <% }) %>
+</div>
+<%- include('partials/footer') %>

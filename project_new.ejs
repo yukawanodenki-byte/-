@@ -1,0 +1,20 @@
+<%- include('partials/header', { title: '案件を追加' }) %>
+<h1>案件を追加</h1>
+<div class="card" style="max-width:520px;">
+  <% if (error) { %><div class="error"><%= error %></div><% } %>
+  <form method="post" action="/projects">
+    <label>案件名 *</label>
+    <input type="text" name="name" required>
+    <label>発注機関</label>
+    <input type="text" name="agency">
+    <label>契約金額</label>
+    <input type="text" name="contract_amount" placeholder="例: 12,000,000円（税込）">
+    <label>工期</label>
+    <input type="text" name="period_text" placeholder="例: 2026/09/01 〜 2027/02/28">
+    <div style="margin-top:16px;">
+      <button class="btn" type="submit">作成</button>
+      <a class="btn secondary" href="/">キャンセル</a>
+    </div>
+  </form>
+</div>
+<%- include('partials/footer') %>
