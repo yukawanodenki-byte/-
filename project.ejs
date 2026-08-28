@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: project.name }) %>
+<%- include('header', { title: project.name }) %>
 <div style="display:flex;justify-content:space-between;align-items:flex-start;">
   <h1><%= project.name %></h1>
   <span class="save-indicator" id="saveIndicator"></span>
@@ -97,4 +97,4 @@
 </div>
 
 <script src="/public/app.js"></script>
-<%- include('partials/footer') %>
+<%- include('footer') %>

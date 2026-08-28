@@ -4,14 +4,16 @@ const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const bcrypt = require('bcryptjs');
 const path = require('path');
-const { pool, initSchema } = require('./db');
+const { pool, initSchema } = require('./index');
 
 const app = express();
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+app.set('views', __dirname);
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use('/public', express.static(path.join(__dirname, 'public')));
+// リポジトリ構成がフラット（サブフォルダなし）のため、公開する静的ファイルだけを明示的に配信する
+app.get('/public/app.js', (req, res) => res.sendFile(path.join(__dirname, 'app.js')));
+app.get('/public/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
 
 app.set('trust proxy', 1); // Render はリバースプロキシ配下で動く
 

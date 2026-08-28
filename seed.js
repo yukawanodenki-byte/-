@@ -3,7 +3,7 @@
 // 既に投入済みの場合は何もしない（冪等）。
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
-const { pool } = require('../db');
+const { pool } = require('./index');
 
 const CATEGORIES = [
   {

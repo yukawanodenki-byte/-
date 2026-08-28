@@ -35,7 +35,7 @@
     return '';
   }
 %>
-<%- include('partials/header', { title: '工程表' }) %>
+<%- include('header', { title: '工程表' }) %>
 <h1>工程表（技術者配置）</h1>
 <p class="helptext">同一技術者が期間の重なる複数案件に配置されている場合、少なくとも一方が専任なら赤、両方とも非専任なら青で表示します。</p>
 
@@ -52,4 +52,4 @@
     </div>
   <% }) %>
 </div>
-<%- include('partials/footer') %>
+<%- include('footer') %>
