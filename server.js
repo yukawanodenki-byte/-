@@ -42,8 +42,14 @@ app.use(async (req, res, next) => {
   res.locals.currentUser = null;
   res.locals.currentPath = req.path;
   if (req.session.userId) {
-    const { rows } = await pool.query('SELECT id, username, display_name, theme FROM users WHERE id = $1', [req.session.userId]);
-    res.locals.currentUser = rows[0] || null;
+    const { rows } = await pool.query('SELECT id, username, display_name, theme, active FROM users WHERE id = $1', [req.session.userId]);
+    const u = rows[0];
+    if (u && u.active) {
+      res.locals.currentUser = u;
+    } else {
+      // 無効化されたメンバーは、セッションが残っていても以降requireAuthで弾かれるようにする
+      req.session.userId = null;
+    }
   }
   next();
 });
@@ -55,8 +61,12 @@ async function logActivity(projectId, userId, action, detail) {
   );
 }
 
+// 案件の担当者選択・体制欄など「これから割り当てる」用途では、無効化済みメンバーは候補に出さない
+// （過去に割り当てられた分の表示自体は各案件データ側にそのまま残るので消えない）
 async function getUsersList() {
-  const { rows } = await pool.query('SELECT id, username, display_name FROM users ORDER BY display_name');
+  const { rows } = await pool.query(
+    "SELECT id, username, display_name FROM users WHERE active = true ORDER BY display_name"
+  );
   return rows;
 }
 
@@ -71,6 +81,7 @@ app.post('/login', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
   const user = rows[0];
   if (!user) return res.render('login', { error: 'ユーザー名またはパスワードが違います' });
+  if (!user.active) return res.render('login', { error: 'このアカウントは無効化されています。管理者（メンバー管理）にご確認ください。' });
   const ok = await bcrypt.compare(password || '', user.password_hash);
   if (!ok) return res.render('login', { error: 'ユーザー名またはパスワードが違います' });
   req.session.userId = user.id;
@@ -89,8 +100,15 @@ app.post('/api/theme', requireAuth, async (req, res) => {
 });
 
 // ---- users (teammates) ----
+async function fetchUsersForList() {
+  const { rows } = await pool.query(
+    'SELECT id, username, display_name, created_at, active FROM users ORDER BY active DESC, id'
+  );
+  return rows;
+}
+
 app.get('/users', requireAuth, async (req, res) => {
-  const { rows: users } = await pool.query('SELECT id, username, display_name, created_at FROM users ORDER BY id');
+  const users = await fetchUsersForList();
   res.render('users', { users, error: null });
 });
 
@@ -104,9 +122,61 @@ app.post('/users', requireAuth, async (req, res) => {
     );
     res.redirect('/users');
   } catch (e) {
-    const { rows: users } = await pool.query('SELECT id, username, display_name, created_at FROM users ORDER BY id');
+    const users = await fetchUsersForList();
     res.render('users', { users, error: 'ユーザー名が重複しているか、入力に誤りがあります。' });
   }
+});
+
+// 表示名の修正・パスワードの再設定（パスワード欄は空欄なら変更しない）
+app.post('/users/:id/edit', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { display_name, password } = req.body;
+  try {
+    if (password && password.trim()) {
+      const hash = await bcrypt.hash(password.trim(), 10);
+      await pool.query('UPDATE users SET display_name = $1, password_hash = $2 WHERE id = $3', [
+        display_name || '',
+        hash,
+        id,
+      ]);
+    } else {
+      await pool.query('UPDATE users SET display_name = $1 WHERE id = $2', [display_name || '', id]);
+    }
+    res.redirect('/users');
+  } catch (e) {
+    const users = await fetchUsersForList();
+    res.render('users', { users, error: 'メンバーの更新に失敗しました。入力内容をご確認ください。' });
+  }
+});
+
+// 削除＝原則そのアカウントを無効化する（過去の更新履歴・担当者表示等に紐づいたユーザー行を消すと、
+// 誰がいつ何をしたかの記録が壊れてしまうため。履歴が一切無い場合のみ本当に行ごと削除する）
+app.post('/users/:id/delete', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  if (id === req.session.userId) {
+    const users = await fetchUsersForList();
+    return res.render('users', { users, error: 'ログイン中の自分自身のアカウントは削除・無効化できません。' });
+  }
+  const { rows: activeCountRows } = await pool.query('SELECT COUNT(*)::int AS n FROM users WHERE active = true');
+  const { rows: targetRows } = await pool.query('SELECT active FROM users WHERE id = $1', [id]);
+  if (targetRows[0] && targetRows[0].active && activeCountRows[0].n <= 1) {
+    const users = await fetchUsersForList();
+    return res.render('users', { users, error: '有効なメンバーが他にいなくなるため、無効化できません。' });
+  }
+  try {
+    // 履歴・担当への参照が一切無ければ、行ごと完全に削除できる
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+  } catch (e) {
+    // 参照がある場合（外部キー制約違反）は、記録を保持したままログイン不可にする「無効化」に切り替える
+    await pool.query('UPDATE users SET active = false WHERE id = $1', [id]);
+  }
+  res.redirect('/users');
+});
+
+app.post('/users/:id/activate', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  await pool.query('UPDATE users SET active = true WHERE id = $1', [id]);
+  res.redirect('/users');
 });
 
 // ---- 必須書類（6種類固定） ----

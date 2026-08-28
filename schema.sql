@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT NOT NULL DEFAULT 'white';
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_theme_check;
 ALTER TABLE users ADD CONSTRAINT users_theme_check CHECK (theme IN ('white', 'dark', 'blue'));
+-- メンバーの無効化（＝実質的な削除）。過去の更新履歴・担当者表示等が壊れないよう、行自体は消さずログイン不可にする
+ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
 
 CREATE TABLE IF NOT EXISTS projects (
   id                SERIAL PRIMARY KEY,

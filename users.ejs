@@ -1,14 +1,48 @@
 <%- include('header', { title: 'メンバー管理' }) %>
 <h1>メンバー管理</h1>
-<p class="helptext">全メンバーが同じ権限でチェックリストを編集できます。担当ごとにアカウントを分けると、誰がいつ更新したかが履歴に残ります。</p>
+<p class="helptext">全メンバーが同じ権限でチェックリストを編集できます。担当ごとにアカウントを分けると、誰がいつ更新したかが履歴に残ります。
+「削除」は、そのメンバーの更新履歴等が案件データに残っている場合、記録を保持するため実際には「無効化」（ログイン不可）として扱われます。履歴が一切無い場合のみ行ごと削除されます。</p>
+
+<% if (error) { %><div class="error"><%= error %></div><% } %>
 
 <div class="card">
   <h2>メンバー一覧</h2>
   <table>
-    <thead><tr><th>ユーザー名</th><th>表示名</th><th>登録日</th></tr></thead>
+    <thead><tr><th>ユーザー名</th><th>表示名</th><th>登録日</th><th>状態</th><th>操作</th></tr></thead>
     <tbody>
       <% users.forEach(u => { %>
-        <tr><td><%= u.username %></td><td><%= u.display_name %></td><td><%= new Date(u.created_at).toLocaleDateString('ja-JP') %></td></tr>
+        <tr class="<%= u.active ? '' : 'user-inactive-row' %>">
+          <td><%= u.username %></td>
+          <td><%= u.display_name %></td>
+          <td><%= new Date(u.created_at).toLocaleDateString('ja-JP') %></td>
+          <td><%= u.active ? '有効' : '無効化済み' %></td>
+          <td class="user-actions">
+            <button type="button" class="btn secondary user-edit-toggle" data-user-id="<%= u.id %>">編集</button>
+            <% if (u.active) { %>
+              <form method="post" action="/users/<%= u.id %>/delete" style="display:inline"
+                onsubmit="return confirm('「<%= u.display_name %>」を削除しますか？\n（更新履歴等が残っている場合は、記録を保持するため「無効化」としてログインできなくなります）')">
+                <button class="btn secondary" type="submit">削除</button>
+              </form>
+            <% } else { %>
+              <form method="post" action="/users/<%= u.id %>/activate" style="display:inline">
+                <button class="btn secondary" type="submit">再度有効化</button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
+        <tr class="user-edit-row" data-user-id="<%= u.id %>" style="display:none;">
+          <td colspan="5">
+            <form method="post" action="/users/<%= u.id %>/edit" class="user-edit-form">
+              <label>表示名
+                <input type="text" name="display_name" value="<%= u.display_name %>">
+              </label>
+              <label>新しいパスワード
+                <input type="text" name="password" placeholder="変更する場合のみ入力">
+              </label>
+              <button class="btn" type="submit">保存</button>
+            </form>
+          </td>
+        </tr>
       <% }) %>
     </tbody>
   </table>
@@ -16,7 +50,6 @@
 
 <div class="card" style="max-width:420px;">
   <h2>メンバーを追加</h2>
-  <% if (error) { %><div class="error"><%= error %></div><% } %>
   <form method="post" action="/users">
     <label>ユーザー名（ログインID）*</label>
     <input type="text" name="username" required>

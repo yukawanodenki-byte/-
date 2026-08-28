@@ -219,4 +219,13 @@
     endInput.addEventListener('change', save);
     exclusiveInputs.forEach((r) => r.addEventListener('change', save));
   });
+
+  // ---- メンバー管理：編集フォームの開閉 ----
+  document.querySelectorAll('.user-edit-toggle').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const row = document.querySelector(`.user-edit-row[data-user-id="${btn.dataset.userId}"]`);
+      if (!row) return;
+      row.style.display = row.style.display === 'none' ? '' : 'none';
+    });
+  });
 })();
