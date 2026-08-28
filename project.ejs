@@ -9,25 +9,28 @@
 <p><a href="/">← 案件一覧に戻る</a></p>
 
 <div class="card">
-  <h2>基本情報</h2>
-  <form method="post" action="/projects/<%= project.id %>/info">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <h2>基本情報</h2>
+    <span class="basic-info-autosave-note">✎ 各項目は入力すると自動で保存されます（保存ボタンは不要です）</span>
+  </div>
+  <div id="basicInfoForm" data-project="<%= project.id %>">
     <label>案件名</label>
-    <input type="text" name="name" value="<%= project.name %>">
+    <input type="text" name="name" class="basic-info-field" value="<%= project.name %>">
     <label>発注機関</label>
-    <input type="text" name="agency" value="<%= project.agency || '' %>">
+    <input type="text" name="agency" class="basic-info-field" value="<%= project.agency || '' %>">
     <label>契約金額</label>
-    <input type="text" name="contract_amount" value="<%= project.contract_amount || '' %>">
+    <input type="text" name="contract_amount" class="basic-info-field" value="<%= project.contract_amount || '' %>">
     <label>工期</label>
-    <input type="text" name="period_text" value="<%= project.period_text || '' %>">
+    <input type="text" name="period_text" class="basic-info-field" value="<%= project.period_text || '' %>">
     <label>作成担当者</label>
-    <select name="assignee_user_id">
+    <select name="assignee_user_id" class="basic-info-field">
       <option value="">未設定</option>
       <% users.forEach(function (u) { %>
         <option value="<%= u.id %>" <%= project.assignee_user_id === u.id ? 'selected' : '' %>><%= u.display_name %></option>
       <% }) %>
     </select>
     <label>共有フォルダのリンク（ドラッグ＆ドロップ可）</label>
-    <input type="text" name="folder_url" class="dropzone" value="<%= project.folder_url || '' %>" placeholder="例: \\server\projects\〇〇工事 または https://... 、ファイル/フォルダをドラッグしても入力できます">
+    <input type="text" name="folder_url" class="basic-info-field dropzone" value="<%= project.folder_url || '' %>" placeholder="例: \\server\projects\〇〇工事 または https://... 、ファイル/フォルダをドラッグしても入力できます">
     <p class="helptext">全員が使っている共有サーバー上のこの案件のフォルダへのリンクです。保存すると案件一覧・このページ上部からすぐ開けます。書類ごとの保存先リンクは下の各行で個別に設定できます。
       ※ ドラッグ＆ドロップはブラウザの仕様上、ファイル名・フォルダ名のみ自動入力されます。完全な保存先（\\server\...等）は自動入力後に手で補ってください。</p>
 
@@ -35,15 +38,15 @@
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
       <div>
         <label>契約日</label>
-        <input type="date" name="contract_date" value="<%= project.contract_date ? project.contract_date.toISOString().slice(0,10) : '' %>">
+        <input type="date" name="contract_date" class="basic-info-field" value="<%= project.contract_date ? project.contract_date.toISOString().slice(0,10) : '' %>">
       </div>
       <div>
         <label>着工日</label>
-        <input type="date" name="construction_start_date" value="<%= project.construction_start_date ? project.construction_start_date.toISOString().slice(0,10) : '' %>">
+        <input type="date" name="construction_start_date" class="basic-info-field" value="<%= project.construction_start_date ? project.construction_start_date.toISOString().slice(0,10) : '' %>">
       </div>
       <div>
         <label>完成期日（完工日）</label>
-        <input type="date" name="construction_end_date" value="<%= project.construction_end_date ? project.construction_end_date.toISOString().slice(0,10) : '' %>">
+        <input type="date" name="construction_end_date" class="basic-info-field" value="<%= project.construction_end_date ? project.construction_end_date.toISOString().slice(0,10) : '' %>">
       </div>
     </div>
     <p class="helptext">この3つの日付が「<a href="/timeline">年間工程表</a>」に反映されます。契約日〜着工日が「準備期間」、着工日〜完成期日が「施工期間」として表示されます。<strong>未入力のままだと年間工程表に「期間未設定」の警告が出ます。</strong>間違えないよう、必ず契約書・工事着手届等の原本の日付で入力してください。</p>
@@ -52,35 +55,33 @@
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
       <div>
         <label>契約担当者 氏名</label>
-        <input type="text" name="contract_officer_name" value="<%= project.contract_officer_name || '' %>" placeholder="発注機関側・契約担当の氏名">
+        <input type="text" name="contract_officer_name" class="basic-info-field" value="<%= project.contract_officer_name || '' %>" placeholder="発注機関側・契約担当の氏名">
       </div>
       <div>
         <label>契約担当者 電話番号</label>
-        <input type="text" name="contract_officer_phone" value="<%= project.contract_officer_phone || '' %>">
+        <input type="text" name="contract_officer_phone" class="basic-info-field" value="<%= project.contract_officer_phone || '' %>">
       </div>
       <div>
         <label>監督職員 氏名</label>
-        <input type="text" name="supervisor_name" value="<%= project.supervisor_name || '' %>" placeholder="現場を監督する発注機関側の担当者">
+        <input type="text" name="supervisor_name" class="basic-info-field" value="<%= project.supervisor_name || '' %>" placeholder="現場を監督する発注機関側の担当者">
       </div>
       <div>
         <label>監督職員 電話番号</label>
-        <input type="text" name="supervisor_phone" value="<%= project.supervisor_phone || '' %>">
+        <input type="text" name="supervisor_phone" class="basic-info-field" value="<%= project.supervisor_phone || '' %>">
       </div>
     </div>
     <label>郵送物の送り先</label>
-    <textarea name="mailing_address" rows="2" placeholder="書類等を郵送する際の宛先住所・部署名"><%= project.mailing_address || '' %></textarea>
-
-    <div style="margin-top:16px;">
-      <button class="btn" type="submit">保存</button>
-      <button class="btn secondary" type="submit" formaction="/projects/<%= project.id %>/archive"
-        onclick="return confirm('この案件をアーカイブしますか？一覧から非表示になります。')">アーカイブ</button>
-    </div>
-  </form>
-  <% if (project.folder_url) { %>
-    <div style="margin-top:12px;">
+    <textarea name="mailing_address" class="basic-info-field" rows="2" placeholder="書類等を郵送する際の宛先住所・部署名"><%= project.mailing_address || '' %></textarea>
+  </div>
+  <div style="margin-top:16px;">
+    <form method="post" action="/projects/<%= project.id %>/archive" style="display:inline"
+      onsubmit="return confirm('この案件をアーカイブしますか？一覧から非表示になります。')">
+      <button class="btn secondary" type="submit">アーカイブ</button>
+    </form>
+    <% if (project.folder_url) { %>
       <a class="btn secondary" href="<%= project.folder_url %>" target="_blank" rel="noopener">📁 共有フォルダを開く</a>
-    </div>
-  <% } %>
+    <% } %>
+  </div>
 </div>
 
 <div class="card">

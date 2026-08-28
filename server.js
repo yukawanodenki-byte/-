@@ -640,6 +640,34 @@ app.post('/projects/:id/info', requireAuth, async (req, res) => {
   res.redirect('/projects/' + projectId);
 });
 
+// 基本情報カードの自動保存用（ページ再読み込み無しで1項目ずつ保存する）
+app.post('/api/projects/:id/info', requireAuth, async (req, res) => {
+  const projectId = Number(req.params.id);
+  const {
+    name, agency, contract_amount, period_text, folder_url, assignee_user_id,
+    contract_date, construction_start_date, construction_end_date,
+    contract_officer_name, contract_officer_phone,
+    supervisor_name, supervisor_phone, mailing_address,
+  } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ ok: false, error: '案件名は必須です' });
+  await pool.query(
+    `UPDATE projects SET name=$1, agency=$2, contract_amount=$3, period_text=$4, folder_url=$5,
+       assignee_user_id=$6, contract_date=$7, construction_start_date=$8, construction_end_date=$9,
+       contract_officer_name=$10, contract_officer_phone=$11, supervisor_name=$12, supervisor_phone=$13,
+       mailing_address=$14, updated_at=now(), updated_by=$15 WHERE id=$16`,
+    [
+      name.trim(), agency || null, contract_amount || null, period_text || null, folder_url || null,
+      assignee_user_id ? Number(assignee_user_id) : null,
+      contract_date || null, construction_start_date || null, construction_end_date || null,
+      contract_officer_name || null, contract_officer_phone || null,
+      supervisor_name || null, supervisor_phone || null, mailing_address || null,
+      req.session.userId, projectId,
+    ]
+  );
+  await logActivity(projectId, req.session.userId, 'update_info', '基本情報を更新');
+  res.json({ ok: true });
+});
+
 app.post('/projects/:id/archive', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
   await pool.query('UPDATE projects SET archived = true WHERE id = $1', [projectId]);

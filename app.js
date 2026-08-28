@@ -128,6 +128,22 @@
     });
   });
 
+  // ---- 基本情報（自動保存：どの項目を変更しても保存ボタン無しですぐ保存される） ----
+  const basicInfoForm = document.getElementById('basicInfoForm');
+  if (basicInfoForm) {
+    const projectId = basicInfoForm.dataset.project;
+    function saveBasicInfo() {
+      const body = {};
+      basicInfoForm.querySelectorAll('.basic-info-field').forEach((el) => {
+        body[el.name] = el.value;
+      });
+      postJSON(`/api/projects/${projectId}/info`, body);
+    }
+    basicInfoForm.querySelectorAll('.basic-info-field').forEach((el) => {
+      el.addEventListener('change', saveBasicInfo);
+    });
+  }
+
   // ---- 体制・工程 ----
   document.querySelectorAll('.tech-col').forEach((col) => {
     const projectId = col.dataset.project;

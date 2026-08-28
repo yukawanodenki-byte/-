@@ -154,6 +154,7 @@ th { color: var(--muted); font-weight: 600; }
 .contractor-fields textarea { width: 280px; font-family: inherit; }
 
 .dropzone.drag-over { border-color: var(--accent) !important; background: #eff6ff; }
+.basic-info-autosave-note { font-size: 12px; color: var(--green); }
 
 .deadline-panel table { margin-top: 8px; }
 
