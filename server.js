@@ -40,6 +40,7 @@ function requireAuth(req, res, next) {
 
 app.use(async (req, res, next) => {
   res.locals.currentUser = null;
+  res.locals.currentPath = req.path;
   if (req.session.userId) {
     const { rows } = await pool.query('SELECT id, username, display_name, theme FROM users WHERE id = $1', [req.session.userId]);
     res.locals.currentUser = rows[0] || null;

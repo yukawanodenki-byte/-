@@ -7,29 +7,53 @@
   <link rel="stylesheet" href="/public/style.css">
 </head>
 <body>
+<%
+  // サイドバーの現在地ハイライト用（CraftBank office等のツールを参考に、左サイドバー構成に変更）
+  const navItems = [
+    { href: '/', icon: '🏠', label: '案件一覧' },
+    { href: '/timeline', icon: '📅', label: '年間工程表' },
+    { href: '/templates', icon: '📄', label: '書類テンプレート' },
+    { href: '/import', icon: '📥', label: '貼り付けインポート' },
+    { href: '/backup', icon: '💾', label: 'バックアップ' },
+    { href: '/users', icon: '👥', label: 'メンバー管理' },
+    { href: '/manual', icon: '❓', label: '使い方マニュアル' },
+  ];
+  const curPath = (typeof currentPath !== 'undefined' && currentPath) || '/';
+  function isNavActive(href) {
+    if (href === '/') return curPath === '/' || curPath.startsWith('/projects');
+    return curPath.startsWith(href);
+  }
+%>
 <% if (locals.currentUser) { %>
-<div class="topbar">
-  <div class="brand">公共工事 提出書類チェックリスト</div>
-  <nav>
-    <a href="/">案件一覧</a>
-    <a href="/timeline">年間工程表</a>
-    <a href="/templates">書類テンプレート</a>
-    <a href="/import">貼り付けインポート</a>
-    <a href="/backup">バックアップ</a>
-    <a href="/users">メンバー管理</a>
-    <a href="/manual">使い方マニュアル</a>
-  </nav>
-  <div class="user">
-    <span class="theme-switcher" data-current="<%= currentUser.theme || 'white' %>">
-      <button type="button" class="theme-btn" data-theme-choice="white" title="白基調">☀</button>
-      <button type="button" class="theme-btn" data-theme-choice="blue" title="青基調">💧</button>
-      <button type="button" class="theme-btn" data-theme-choice="dark" title="黒基調">🌙</button>
-    </span>
-    <%= currentUser.display_name %>さん
-    <form method="post" action="/logout" style="display:inline">
-      <button class="link" type="submit">ログアウト</button>
-    </form>
-  </div>
-</div>
-<% } %>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="sidebar-brand-icon">🏗</span>
+      <span class="sidebar-brand-text">公共工事<br><small>提出書類チェックリスト</small></span>
+    </div>
+    <nav class="sidebar-nav">
+      <% navItems.forEach(function (item) { %>
+        <a href="<%= item.href %>" class="<%= isNavActive(item.href) ? 'active' : '' %>">
+          <span class="nav-icon"><%= item.icon %></span><%= item.label %>
+        </a>
+      <% }) %>
+    </nav>
+  </aside>
+  <div class="main-area">
+    <div class="topbar">
+      <span class="theme-switcher" data-current="<%= currentUser.theme || 'white' %>">
+        <button type="button" class="theme-btn" data-theme-choice="white" title="白基調">☀</button>
+        <button type="button" class="theme-btn" data-theme-choice="blue" title="青基調">💧</button>
+        <button type="button" class="theme-btn" data-theme-choice="dark" title="黒基調">🌙</button>
+      </span>
+      <div class="user">
+        <%= currentUser.display_name %>さん
+        <form method="post" action="/logout" style="display:inline">
+          <button class="link" type="submit">ログアウト</button>
+        </form>
+      </div>
+    </div>
+    <div class="container">
+<% } else { %>
 <div class="container">
+<% } %>
