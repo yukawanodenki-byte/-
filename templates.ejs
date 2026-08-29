@@ -16,6 +16,51 @@
 </div>
 
 <div class="card">
+  <h2>提出書類の参考例（過去の提出データ）</h2>
+  <p class="helptext">実際に提出した書類の内容や書き方を、書類名ごとに自由に貼り付けて残せます。全メンバーが見られるので、「この書類はこんな感じで出している」という参考にしてください。案件を問わず、53項目の書類・必須書類のどれについても追加できます。</p>
+  <% if (sampleError) { %><div class="error"><%= sampleError %></div><% } %>
+
+  <% const labels = Object.keys(samplesByLabel); %>
+  <% if (labels.length === 0) { %>
+    <p class="helptext">まだ参考例が登録されていません。下のフォームから追加してください。</p>
+  <% } %>
+  <% labels.forEach(label => { %>
+    <details class="checklist-category">
+      <summary><%= label %> <span class="cat-count">(<%= samplesByLabel[label].length %>件)</span></summary>
+      <% samplesByLabel[label].forEach(s => { %>
+        <div class="sample-item">
+          <div class="sample-meta">
+            <% if (s.project_name) { %><strong><%= s.project_name %></strong><% } %>
+            <span class="helptext"><%= s.created_by_name || '不明' %> — <%= new Date(s.created_at).toLocaleString('ja-JP') %></span>
+          </div>
+          <% if (s.content) { %><p class="sample-content"><%= s.content %></p><% } %>
+          <% if (s.link_url) { %><a class="btn secondary" href="<%= s.link_url %>" target="_blank" rel="noopener">📁 実ファイルを開く</a><% } %>
+          <form method="post" action="/templates/samples/<%= s.id %>/delete" style="display:inline"
+            onsubmit="return confirm('この参考例を削除しますか？')">
+            <button class="btn secondary" type="submit">削除</button>
+          </form>
+        </div>
+      <% }) %>
+    </details>
+  <% }) %>
+
+  <h3 style="font-size:14px;margin:20px 0 4px;">参考例を追加</h3>
+  <form method="post" action="/templates/samples">
+    <label>書類名 *</label>
+    <input type="text" name="doc_label" required placeholder="例: 工事費内訳書、施工体制台帳 など">
+    <label>参考にした案件名（任意）</label>
+    <input type="text" name="project_name" placeholder="例: 松江刑務所LED化改修工事">
+    <label>内容・書き方のメモ（貼り付け可）</label>
+    <textarea name="content" rows="6" placeholder="実際に提出した書類の内容や、記入の仕方のポイントなどを貼り付けてください"></textarea>
+    <label>実ファイルの保存先リンク（任意）</label>
+    <input type="text" name="link_url" placeholder="共有サーバー上の実ファイルへのリンクがあれば">
+    <div style="margin-top:14px;">
+      <button class="btn" type="submit">追加</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
   <h2>今後追加予定</h2>
   <p class="helptext">契約書・見積書などの雛形も、必要なファイルを教えていただければ順次ここに追加していきます。将来的には仕様書から内容を読み取って自動作成するところまで対応予定です（現在は雛形のプレビューのみ）。</p>
 </div>

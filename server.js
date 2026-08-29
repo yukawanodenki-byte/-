@@ -539,7 +539,7 @@ const TEMPLATE_FILES = [
   },
 ];
 
-app.get('/templates', requireAuth, (req, res) => {
+app.get('/templates', requireAuth, async (req, res) => {
   const baseUrl = `${req.protocol}://${req.get('host')}`;
   const templates = TEMPLATE_FILES.map((t) => {
     const fileUrl = `/template-files/${t.filename}`;
@@ -549,13 +549,44 @@ app.get('/templates', requireAuth, (req, res) => {
       viewerUrl: `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(baseUrl + fileUrl)}`,
     };
   });
-  res.render('templates', { templates });
+
+  // 提出書類の参考例（過去に実際に提出した書類の内容を、書類名ごとに自由に貼り付けて全員で見られるようにしたもの）
+  const { rows: sampleRows } = await pool.query(
+    `SELECT s.*, u.display_name AS created_by_name
+     FROM document_samples s LEFT JOIN users u ON u.id = s.created_by
+     ORDER BY s.doc_label, s.created_at DESC`
+  );
+  const samplesByLabel = {};
+  sampleRows.forEach((s) => {
+    if (!samplesByLabel[s.doc_label]) samplesByLabel[s.doc_label] = [];
+    samplesByLabel[s.doc_label].push(s);
+  });
+
+  res.render('templates', { templates, samplesByLabel, sampleError: req.query.sampleError || null });
 });
 
 app.get('/template-files/:filename', (req, res) => {
   const file = TEMPLATE_FILES.find((t) => t.filename === req.params.filename);
   if (!file) return res.status(404).send('Not found');
   res.sendFile(path.join(__dirname, file.filename));
+});
+
+// ---- 提出書類の参考例（過去の提出データを書類ごとに自由に貼り付け・全員で参照） ----
+app.post('/templates/samples', requireAuth, async (req, res) => {
+  const { doc_label, project_name, content, link_url } = req.body;
+  if (!doc_label || !doc_label.trim() || (!(content || '').trim() && !(link_url || '').trim())) {
+    return res.redirect('/templates?sampleError=' + encodeURIComponent('書類名と、内容またはリンクのいずれかは必須です。'));
+  }
+  await pool.query(
+    'INSERT INTO document_samples (doc_label, project_name, content, link_url, created_by) VALUES ($1,$2,$3,$4,$5)',
+    [doc_label.trim(), (project_name || '').trim() || null, (content || '').trim() || null, (link_url || '').trim() || null, req.session.userId]
+  );
+  res.redirect('/templates');
+});
+
+app.post('/templates/samples/:id/delete', requireAuth, async (req, res) => {
+  await pool.query('DELETE FROM document_samples WHERE id = $1', [req.params.id]);
+  res.redirect('/templates');
 });
 
 // ---- バックアップ（データ破損・消失対策） ----

@@ -10,7 +10,7 @@
 // 本当の意味でのデータ消失対策としては、/backup ページの「ダウンロード」でJSONファイルを
 // 定期的に手元（PC）に保存しておくことを推奨する。
 
-const BACKUP_TABLES = ['projects', 'required_documents', 'checklist_status', 'project_technicians', 'activity_log'];
+const BACKUP_TABLES = ['projects', 'required_documents', 'checklist_status', 'project_technicians', 'activity_log', 'document_samples'];
 
 async function snapshotData(pool) {
   const data = {};
@@ -108,17 +108,20 @@ async function restoreBackup(pool, backupId, userId) {
     await client.query('DELETE FROM required_documents');
     await client.query('DELETE FROM checklist_status');
     await client.query('DELETE FROM projects');
+    await client.query('DELETE FROM document_samples');
 
     await insertRows(client, 'projects', data.projects);
     await insertRows(client, 'required_documents', data.required_documents);
     await insertRows(client, 'checklist_status', data.checklist_status);
     await insertRows(client, 'project_technicians', data.project_technicians);
     await insertRows(client, 'activity_log', data.activity_log);
+    await insertRows(client, 'document_samples', data.document_samples);
 
     await resetSequenceIfNeeded(client, 'projects');
     await resetSequenceIfNeeded(client, 'required_documents');
     await resetSequenceIfNeeded(client, 'project_technicians');
     await resetSequenceIfNeeded(client, 'activity_log');
+    await resetSequenceIfNeeded(client, 'document_samples');
 
     await client.query('COMMIT');
   } catch (e) {

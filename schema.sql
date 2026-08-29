@@ -159,6 +159,20 @@ CREATE TABLE IF NOT EXISTS backups (
 );
 CREATE INDEX IF NOT EXISTS idx_backups_created_at ON backups(created_at DESC);
 
+-- 提出書類の参考例（過去に実際に提出した書類の内容・様式メモを、書類の種類ごとに自由に貼り付けて
+-- 全メンバーで参照できるようにする。書類テンプレート画面から追加・削除。特定の案件に紐付けず、
+-- 「この書類はこんな感じで出している」という参考情報として蓄積する）
+CREATE TABLE IF NOT EXISTS document_samples (
+  id            SERIAL PRIMARY KEY,
+  doc_label     TEXT NOT NULL,      -- 書類名（自由記述。「工事費内訳書」「施工体制台帳」等、53項目や必須書類に限らない）
+  project_name  TEXT,               -- 参考にした案件名（任意）
+  content       TEXT,               -- 貼り付けた内容・書き方のメモ（自由記述）
+  link_url      TEXT,               -- 実ファイルの保存先リンク（任意）
+  created_by    INT REFERENCES users(id),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_document_samples_doc_label ON document_samples(doc_label);
+
 CREATE INDEX IF NOT EXISTS idx_activity_log_project ON activity_log(project_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_technicians_dates ON project_technicians(start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_checklist_status_due ON checklist_status(due_date);

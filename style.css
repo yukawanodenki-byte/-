@@ -85,6 +85,12 @@ a:hover { text-decoration: underline; }
   flex-direction: column;
   gap: 4px;
   transition: background-color .15s, border-color .15s;
+  /* 画面をスクロールしてもサイドバーは固定表示されるようにする */
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
 }
 .sidebar-brand {
   display: flex;
@@ -140,7 +146,10 @@ a:hover { text-decoration: underline; }
 
 @media (max-width: 860px) {
   .app-shell { flex-direction: column; }
-  .sidebar { width: 100%; flex-direction: row; align-items: center; overflow-x: auto; padding: 8px; gap: 2px; }
+  .sidebar {
+    width: 100%; flex-direction: row; align-items: center; overflow-x: auto; overflow-y: visible;
+    padding: 8px; gap: 2px; height: auto; z-index: 20;
+  }
   .sidebar-brand { display: none; }
   .sidebar-nav { flex-direction: row; }
   .sidebar-nav a { flex-direction: column; gap: 2px; font-size: 10px; padding: 6px 10px; white-space: nowrap; }
@@ -230,6 +239,11 @@ table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--border); font-size: 13px; }
 th { color: var(--muted); font-weight: 600; }
 tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+
+.sample-item { border-top: 1px solid var(--border); padding: 10px 0; }
+.sample-item:first-of-type { border-top: none; }
+.sample-meta { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.sample-content { white-space: pre-wrap; background: color-mix(in srgb, var(--accent) 5%, var(--card)); border-radius: 6px; padding: 10px 12px; font-size: 13px; margin: 0 0 8px; }
 
 .user-actions { display: flex; gap: 8px; }
 .user-inactive-row { opacity: .55; }
