@@ -236,6 +236,8 @@ label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px
 .due-badge.red { background: color-mix(in srgb, var(--red) 18%, var(--card)); color: var(--red); }
 
 table { border-collapse: collapse; width: 100%; }
+.table-scroll { overflow-x: auto; }
+.table-scroll table { min-width: 480px; }
 th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--border); font-size: 13px; }
 th { color: var(--muted); font-weight: 600; }
 tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
@@ -325,11 +327,13 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); 
 
 .deadline-panel table { margin-top: 8px; }
 
-/* 年間工程表 */
-.schedule-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-bottom: 14px; flex-wrap: wrap; }
+/* 年間工程表（着工日〜完成期日の施工期間バー＋技術者の配置期間バーを同じ行に統合表示） */
+.schedule-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
 .legend-swatch { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
-.legend-swatch.prep { background: var(--muted); opacity: .5; }
 .legend-swatch.build { background: var(--accent); }
+.legend-swatch.tech { background: color-mix(in srgb, var(--muted) 55%, var(--card)); height: 7px; }
+.legend-swatch.tech.red { background: var(--red); }
+.legend-swatch.tech.blue { background: var(--blue); }
 .legend-swatch.today { background: var(--red); width: 2px; height: 14px; }
 
 .schedule-scroll { overflow-x: auto; }
@@ -339,14 +343,19 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); 
 .schedule-months-track { position: relative; flex: 1; height: 20px; }
 .schedule-month-tick { position: absolute; top: 0; font-size: 11px; color: var(--muted); border-left: 1px solid var(--border); padding-left: 4px; height: 100%; }
 
-.schedule-row { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-.schedule-row-label { width: 220px; flex-shrink: 0; padding-right: 8px; }
+.schedule-row { display: flex; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.schedule-row-label { width: 220px; flex-shrink: 0; padding-right: 8px; padding-top: 4px; }
 .schedule-row-label .note { color: var(--muted); font-size: 11px; display: block; }
-.schedule-row-track { position: relative; flex: 1; height: 26px; background: var(--track-bg); border-radius: 4px; }
-.schedule-bar { position: absolute; top: 4px; height: 18px; border-radius: 4px; }
-.schedule-bar.prep { background: var(--muted); opacity: .5; }
+.schedule-row-track { position: relative; flex: 1; display: flex; flex-direction: column; gap: 5px; padding: 2px 0; }
+.schedule-bar-lane { position: relative; background: var(--track-bg); border-radius: 4px; height: 22px; }
+.schedule-bar-lane.tech { height: 16px; }
+.schedule-bar { position: absolute; top: 2px; height: 18px; border-radius: 4px; background: var(--accent); }
 .schedule-bar.build { background: var(--accent); }
-.schedule-bar-dates { position: absolute; left: 100%; top: 0; margin-left: 8px; white-space: nowrap; font-size: 11px; color: var(--text); }
+.schedule-bar.tech { top: 1px; height: 14px; background: color-mix(in srgb, var(--muted) 55%, var(--card)); }
+.schedule-bar.tech.red { background: var(--red); }
+.schedule-bar.tech.blue { background: var(--blue); }
+.schedule-bar-dates { position: absolute; left: 100%; top: 0; margin-left: 8px; white-space: nowrap; font-size: 11px; color: var(--text); line-height: 18px; }
+.schedule-bar-dates.tech-label { line-height: 14px; color: var(--muted); }
 .schedule-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red); z-index: 2; }
 .schedule-missing { color: var(--red); font-size: 12px; padding: 4px 0; }
 
@@ -361,11 +370,35 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); 
 
 .activity-log li { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 
-.timeline-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-.timeline-row .label { width: 260px; flex-shrink: 0; }
-.timeline-bar-wrap { flex: 1; background: var(--track-bg); border-radius: 4px; height: 18px; position: relative; }
-.timeline-bar { position: absolute; top: 0; height: 100%; border-radius: 4px; background: var(--accent); }
-.timeline-bar.red { background: var(--red); }
-.timeline-bar.blue { background: var(--blue); }
-
 .helptext { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+.form-grid { display: grid; gap: 12px; margin-top: 4px; }
+.form-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.form-grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+/* ---- モバイル対応（スマホでも問題なく閲覧・操作できるようにする） ---- */
+@media (max-width: 700px) {
+  .container { padding: 14px 12px 48px; }
+  h1 { font-size: 18px; }
+  h2 { font-size: 15px; }
+  .card { padding: 14px; }
+
+  .project-grid { grid-template-columns: 1fr; }
+  .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
+  .tech-grid { grid-template-columns: 1fr; }
+  .contractor-fields { flex-direction: column; align-items: stretch; }
+  .contractor-fields input[type=text],
+  .contractor-fields input[type=date],
+  .contractor-fields textarea { width: 100%; }
+
+  .field-row-controls { flex-direction: column; align-items: stretch; }
+  .field-row-controls input[type=date],
+  .field-row-controls input[type=text],
+  .field-row-controls .field-submission-method { width: 100%; }
+  .field-row-controls .field-open-link { align-self: flex-start; }
+
+  .user-edit-form { flex-direction: column; align-items: stretch; }
+
+  .topbar { padding: 8px 12px; flex-wrap: wrap; gap: 8px; }
+  .topbar .user { font-size: 12px; }
+}

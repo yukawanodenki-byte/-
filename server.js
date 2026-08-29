@@ -456,25 +456,64 @@ app.get('/', requireAuth, async (req, res) => {
   res.render('dashboard', { summaries, upcomingDeadlines, STATUS_LABELS });
 });
 
-// ---- 年間工程表（契約期間ベース：準備期間／着工／完工が一目でわかる） ----
-// 表示範囲は「発注機関の年度」等を仮定せず、実際に登録されている案件データ（契約日〜完成期日）から
-// 機械的に算出する（誤った年度の思い込みでズレるのを避けるため）。範囲は月初〜月末に丸めて見やすくする。
+// ---- 年間工程表（着工日〜完成期日ベース：施工期間と技術者の配置が一目でわかる） ----
+// 表示範囲は「発注機関の年度」等を仮定せず、実際に登録されている案件データ（着工日〜完成期日）と
+// 技術者の配置期間から機械的に算出する（誤った年度の思い込みでズレるのを避けるため）。
+// 範囲は月初〜月末に丸めて見やすくする。
+const TECH_ROLE_SHORT = { '監理技術者': '監理', '主任技術者': '主任', '現場代理人': '代理人' };
+
 async function computeAnnualSchedule() {
   const { rows: projects } = await pool.query(
-    `SELECT id, name, agency, contract_date, construction_start_date, construction_end_date, assignee_user_id
+    `SELECT id, name, agency, construction_start_date, construction_end_date, assignee_user_id
      FROM projects WHERE archived = false ORDER BY construction_start_date ASC NULLS LAST, created_at ASC`
   );
   const { rows: users } = await pool.query('SELECT id, display_name FROM users');
   const userNameById = {};
   users.forEach((u) => { userNameById[u.id] = u.display_name; });
 
+  const { rows: techs } = await pool.query(
+    `SELECT * FROM project_technicians WHERE start_date IS NOT NULL AND end_date IS NOT NULL ORDER BY start_date`
+  );
+  const techsByProject = {};
+  techs.forEach((t) => {
+    if (!techsByProject[t.project_id]) techsByProject[t.project_id] = [];
+    techsByProject[t.project_id].push(t);
+  });
+
+  // 技術者の配置期間の重複検知（同一氏名が期間の重なる別案件に配置されている場合。
+  // 少なくとも一方が専任なら赤、両方とも非専任なら青）。年間工程表・体制の重複バッジと同じロジック。
+  const overlapKeys = new Set();
+  const validTechs = techs.filter((t) => t.person_name && !['×', '-', 'ー', ''].includes(t.person_name.trim()));
+  for (let i = 0; i < validTechs.length; i++) {
+    for (let j = i + 1; j < validTechs.length; j++) {
+      const a = validTechs[i], b = validTechs[j];
+      if (a.project_id === b.project_id) continue;
+      if (a.person_name.trim() !== b.person_name.trim()) continue;
+      const overlap = new Date(a.start_date) <= new Date(b.end_date) && new Date(b.start_date) <= new Date(a.end_date);
+      if (overlap) {
+        const sev = (a.exclusive || b.exclusive) ? 'red' : 'blue';
+        overlapKeys.add(a.id + ':' + sev);
+        overlapKeys.add(b.id + ':' + sev);
+      }
+    }
+  }
+  function techSeverity(t) {
+    if (overlapKeys.has(t.id + ':red')) return 'red';
+    if (overlapKeys.has(t.id + ':blue')) return 'blue';
+    return null;
+  }
+
   const withDates = projects.filter((p) => p.construction_start_date && p.construction_end_date);
   const today = new Date();
   let rangeStart = null;
   let rangeEnd = null;
   withDates.forEach((p) => {
-    const s = p.contract_date || p.construction_start_date;
-    const e = p.construction_end_date;
+    if (!rangeStart || p.construction_start_date < rangeStart) rangeStart = p.construction_start_date;
+    if (!rangeEnd || p.construction_end_date > rangeEnd) rangeEnd = p.construction_end_date;
+  });
+  // 技術者の配置期間が案件の着工〜完工より外にはみ出すこともあるため、範囲計算にも含める
+  techs.forEach((t) => {
+    const s = new Date(t.start_date), e = new Date(t.end_date);
     if (!rangeStart || s < rangeStart) rangeStart = s;
     if (!rangeEnd || e > rangeEnd) rangeEnd = e;
   });
@@ -501,14 +540,25 @@ async function computeAnnualSchedule() {
   }
 
   const rows = projects.map((p) => {
-    const prepStartRaw = p.contract_date || p.construction_start_date;
+    const projectTechs = (techsByProject[p.id] || []).map((t) => ({
+      id: t.id,
+      role: t.role,
+      roleShort: TECH_ROLE_SHORT[t.role] || t.role,
+      personName: t.person_name,
+      exclusive: t.exclusive,
+      startDate: t.start_date,
+      endDate: t.end_date,
+      startPct: pct(t.start_date),
+      endPct: pct(t.end_date),
+      severity: techSeverity(t),
+    }));
     return {
       project: p,
       assigneeName: p.assignee_user_id ? (userNameById[p.assignee_user_id] || '不明') : null,
       missing: !p.construction_start_date || !p.construction_end_date,
-      prepStartPct: pct(prepStartRaw),
       startPct: pct(p.construction_start_date),
       endPct: pct(p.construction_end_date),
+      techs: projectTechs,
     };
   });
 
@@ -517,13 +567,7 @@ async function computeAnnualSchedule() {
 
 app.get('/timeline', requireAuth, async (req, res) => {
   const schedule = await computeAnnualSchedule();
-  const { rows: techs } = await pool.query(
-    `SELECT t.*, p.name AS project_name FROM project_technicians t
-     JOIN projects p ON p.id = t.project_id
-     WHERE t.start_date IS NOT NULL AND t.end_date IS NOT NULL
-     ORDER BY t.start_date`
-  );
-  res.render('timeline', { schedule, techs });
+  res.render('timeline', { schedule });
 });
 
 // ---- 書類テンプレート（雛形のプレビュー・ダウンロード） ----
@@ -767,23 +811,27 @@ app.get('/projects/:id', requireAuth, async (req, res) => {
   });
 });
 
+// 注意：contract_date（契約日）は基本情報フォームから廃止済み（年間工程表・案件一覧の工期は
+// 着工日〜完成期日を基準にする）。ただしDB列・過去の入力値はそのまま残しており、
+// このUPDATE文からは意図的にcontract_dateを外している（含めてしまうと、フォームに存在しない
+// フィールドのせいで自動保存のたびに既存のcontract_date値がNULLで上書きされてしまうため）。
 app.post('/projects/:id/info', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
   const {
     name, agency, contract_amount, period_text, folder_url, assignee_user_id,
-    contract_date, construction_start_date, construction_end_date,
+    construction_start_date, construction_end_date,
     contract_officer_name, contract_officer_phone,
     supervisor_name, supervisor_phone, mailing_address,
   } = req.body;
   await pool.query(
     `UPDATE projects SET name=$1, agency=$2, contract_amount=$3, period_text=$4, folder_url=$5,
-       assignee_user_id=$6, contract_date=$7, construction_start_date=$8, construction_end_date=$9,
-       contract_officer_name=$10, contract_officer_phone=$11, supervisor_name=$12, supervisor_phone=$13,
-       mailing_address=$14, updated_at=now(), updated_by=$15 WHERE id=$16`,
+       assignee_user_id=$6, construction_start_date=$7, construction_end_date=$8,
+       contract_officer_name=$9, contract_officer_phone=$10, supervisor_name=$11, supervisor_phone=$12,
+       mailing_address=$13, updated_at=now(), updated_by=$14 WHERE id=$15`,
     [
       name, agency, contract_amount, period_text, folder_url || null,
       assignee_user_id ? Number(assignee_user_id) : null,
-      contract_date || null, construction_start_date || null, construction_end_date || null,
+      construction_start_date || null, construction_end_date || null,
       contract_officer_name || null, contract_officer_phone || null,
       supervisor_name || null, supervisor_phone || null, mailing_address || null,
       req.session.userId, projectId,
@@ -798,20 +846,20 @@ app.post('/api/projects/:id/info', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
   const {
     name, agency, contract_amount, period_text, folder_url, assignee_user_id,
-    contract_date, construction_start_date, construction_end_date,
+    construction_start_date, construction_end_date,
     contract_officer_name, contract_officer_phone,
     supervisor_name, supervisor_phone, mailing_address,
   } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ ok: false, error: '案件名は必須です' });
   await pool.query(
     `UPDATE projects SET name=$1, agency=$2, contract_amount=$3, period_text=$4, folder_url=$5,
-       assignee_user_id=$6, contract_date=$7, construction_start_date=$8, construction_end_date=$9,
-       contract_officer_name=$10, contract_officer_phone=$11, supervisor_name=$12, supervisor_phone=$13,
-       mailing_address=$14, updated_at=now(), updated_by=$15 WHERE id=$16`,
+       assignee_user_id=$6, construction_start_date=$7, construction_end_date=$8,
+       contract_officer_name=$9, contract_officer_phone=$10, supervisor_name=$11, supervisor_phone=$12,
+       mailing_address=$13, updated_at=now(), updated_by=$14 WHERE id=$15`,
     [
       name.trim(), agency || null, contract_amount || null, period_text || null, folder_url || null,
       assignee_user_id ? Number(assignee_user_id) : null,
-      contract_date || null, construction_start_date || null, construction_end_date || null,
+      construction_start_date || null, construction_end_date || null,
       contract_officer_name || null, contract_officer_phone || null,
       supervisor_name || null, supervisor_phone || null, mailing_address || null,
       req.session.userId, projectId,

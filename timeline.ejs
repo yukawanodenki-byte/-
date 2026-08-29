@@ -1,15 +1,18 @@
 <%- include('header', { title: '年間工程表' }) %>
 <h1>年間工程表</h1>
 <p class="helptext">
-  各案件の「契約日」「着工日」「完成期日（完工日）」をもとに自動計算した工程表です。契約日〜着工日を「準備期間」（グレー）、
-  着工日〜完成期日を「施工期間」（青）として表示します。赤い縦線は「今日」です。
-  <strong>日付は必ず案件詳細ページの「基本情報」で正しく入力してください。未入力の案件は下に警告として表示されます。</strong>
+  各案件の「着工日」〜「完成期日（完工日）」をもとに自動計算した工程表です。太い青いバーが施工期間、その下の細いバーが
+  技術者（監理技術者・主任技術者・現場代理人）の配置期間です。同一の技術者が期間の重なる別の案件にも配置されている場合、
+  少なくとも一方が専任なら赤、両方とも非専任なら青で警告表示します。赤い縦線は「今日」です。
+  <strong>日付は必ず案件詳細ページの「基本情報」「体制・工程」で正しく入力してください。未入力の案件は下に警告として表示されます。</strong>
 </p>
 
 <div class="card">
   <div class="schedule-legend">
-    <span><span class="legend-swatch prep"></span>準備期間（契約日〜着工日）</span>
     <span><span class="legend-swatch build"></span>施工期間（着工日〜完成期日）</span>
+    <span><span class="legend-swatch tech"></span>技術者の配置期間</span>
+    <span><span class="legend-swatch tech red"></span>配置の重複（専任を含む）</span>
+    <span><span class="legend-swatch tech blue"></span>配置の重複（非専任同士）</span>
     <span><span class="legend-swatch today"></span>今日</span>
   </div>
 
@@ -41,67 +44,28 @@
                 <div class="schedule-today-line" style="left:<%= schedule.todayPct %>%;"></div>
               <% } %>
               <% if (r.missing) { %>
-                <div class="schedule-missing">⚠ 契約日／着工日／完成期日が未入力です。<a href="/projects/<%= r.project.id %>">この案件で入力する</a></div>
+                <div class="schedule-bar-lane build">
+                  <div class="schedule-missing">⚠ 着工日／完成期日が未入力です。<a href="/projects/<%= r.project.id %>">この案件で入力する</a></div>
+                </div>
               <% } else { %>
-                <% if (r.prepStartPct !== null && r.startPct !== null && r.startPct > r.prepStartPct) { %>
-                  <div class="schedule-bar prep" style="left:<%= r.prepStartPct %>%; width:<%= Math.max(0.5, r.startPct - r.prepStartPct) %>%;"></div>
-                <% } %>
-                <div class="schedule-bar build" style="left:<%= r.startPct %>%; width:<%= Math.max(1, r.endPct - r.startPct) %>%;">
-                  <span class="schedule-bar-dates">着工 <%= r.project.construction_start_date.toISOString().slice(0,10) %> ／ 完工 <%= r.project.construction_end_date.toISOString().slice(0,10) %></span>
+                <div class="schedule-bar-lane build">
+                  <div class="schedule-bar build" style="left:<%= r.startPct %>%; width:<%= Math.max(1, r.endPct - r.startPct) %>%;">
+                    <span class="schedule-bar-dates">着工 <%= r.project.construction_start_date.toISOString().slice(0,10) %> ／ 完工 <%= r.project.construction_end_date.toISOString().slice(0,10) %></span>
+                  </div>
                 </div>
               <% } %>
+              <% r.techs.forEach(t => { %>
+                <div class="schedule-bar-lane tech">
+                  <div class="schedule-bar tech <%= t.severity || '' %>" style="left:<%= t.startPct %>%; width:<%= Math.max(0.5, t.endPct - t.startPct) %>%;">
+                    <span class="schedule-bar-dates tech-label"><%= t.roleShort %>：<%= t.personName %>（<%= t.exclusive ? '専任' : '非専任' %>）<% if (t.severity) { %> ⚠重複<% } %></span>
+                  </div>
+                </div>
+              <% }) %>
             </div>
           </div>
         <% }) %>
       </div>
     </div>
   <% } %>
-</div>
-
-<div class="card">
-  <h2>技術者の配置期間（重複チェック）</h2>
-  <p class="helptext">上の年間工程表とは別の一覧です。同一技術者が期間の重なる複数案件に配置されている場合、少なくとも一方が専任なら赤、両方とも非専任なら青で表示します。</p>
-  <%
-    let minDate = null, maxDate = null;
-    techs.forEach(t => {
-      const s = new Date(t.start_date), e = new Date(t.end_date);
-      if (!minDate || s < minDate) minDate = s;
-      if (!maxDate || e > maxDate) maxDate = e;
-    });
-    if (!minDate) { minDate = new Date(); maxDate = new Date(Date.now() + 1000*60*60*24*180); }
-    const totalMs = maxDate - minDate || 1;
-    function pct(d) { return Math.max(0, Math.min(100, ((new Date(d) - minDate) / totalMs) * 100)); }
-    const overlapKeys = new Set();
-    const valid = techs.filter(t => t.person_name && !['×','-','ー',''].includes(t.person_name.trim()));
-    for (let i=0;i<valid.length;i++) {
-      for (let j=i+1;j<valid.length;j++) {
-        const a = valid[i], b = valid[j];
-        if (a.project_id === b.project_id) continue;
-        if (a.person_name.trim() !== b.person_name.trim()) continue;
-        const overlap = new Date(a.start_date) <= new Date(b.end_date) && new Date(b.start_date) <= new Date(a.end_date);
-        if (overlap) {
-          const sev = (a.exclusive || b.exclusive) ? 'red' : 'blue';
-          overlapKeys.add(a.id + ':' + sev);
-          overlapKeys.add(b.id + ':' + sev);
-        }
-      }
-    }
-    function barClass(t) {
-      if (overlapKeys.has(t.id + ':red')) return 'red';
-      if (overlapKeys.has(t.id + ':blue')) return 'blue';
-      return '';
-    }
-  %>
-  <% if (techs.length === 0) { %>
-    <p>期間が入力された技術者データがまだありません。各案件の「体制・工程」から開始日・終了日を入力してください。</p>
-  <% } %>
-  <% techs.forEach(t => { %>
-    <div class="timeline-row">
-      <div class="label"><%= t.project_name %> / <%= t.role %>（<%= t.person_name %>）</div>
-      <div class="timeline-bar-wrap">
-        <div class="timeline-bar <%= barClass(t) %>" style="left:<%= pct(t.start_date) %>%; width:<%= Math.max(1, pct(t.end_date) - pct(t.start_date)) %>%"></div>
-      </div>
-    </div>
-  <% }) %>
 </div>
 <%- include('footer') %>

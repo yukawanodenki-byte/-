@@ -25,33 +25,35 @@
   <% if (backups.length === 0) { %>
     <p>まだバックアップがありません。</p>
   <% } else { %>
-    <table>
-      <thead>
-        <tr><th>作成日時</th><th>種類</th><th>案件数</th><th>作成者</th><th></th></tr>
-      </thead>
-      <tbody>
-        <% backups.forEach(b => { %>
-          <tr>
-            <td><%= new Date(b.created_at).toLocaleString('ja-JP') %></td>
-            <td>
-              <% if (b.kind === 'auto') { %>自動
-              <% } else if (b.kind === 'manual') { %>手動
-              <% } else { %>復元直前の自動退避
-              <% } %>
-            </td>
-            <td><%= b.project_count %>件</td>
-            <td><%= b.created_by_name || '（自動）' %></td>
-            <td style="display:flex;gap:8px;">
-              <a class="btn secondary" href="/backup/<%= b.id %>/download">⬇ ダウンロード</a>
-              <form method="post" action="/backup/<%= b.id %>/restore"
-                onsubmit="return confirm('本当にこのバックアップ（' + '<%= new Date(b.created_at).toLocaleString('ja-JP') %>' + '時点）の状態に戻しますか？\n\n現在のデータは上書きされます（ただし復元直前の状態も自動でバックアップされるので、間違えてもさらに戻すことはできます）。')">
-                <button class="btn secondary" type="submit" style="color:var(--red);border-color:var(--red);">⏪ このバックアップから復元</button>
-              </form>
-            </td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>作成日時</th><th>種類</th><th>案件数</th><th>作成者</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% backups.forEach(b => { %>
+            <tr>
+              <td><%= new Date(b.created_at).toLocaleString('ja-JP') %></td>
+              <td>
+                <% if (b.kind === 'auto') { %>自動
+                <% } else if (b.kind === 'manual') { %>手動
+                <% } else { %>復元直前の自動退避
+                <% } %>
+              </td>
+              <td><%= b.project_count %>件</td>
+              <td><%= b.created_by_name || '（自動）' %></td>
+              <td style="display:flex;gap:8px;flex-wrap:wrap;">
+                <a class="btn secondary" href="/backup/<%= b.id %>/download">⬇ ダウンロード</a>
+                <form method="post" action="/backup/<%= b.id %>/restore"
+                  onsubmit="return confirm('本当にこのバックアップ（' + '<%= new Date(b.created_at).toLocaleString('ja-JP') %>' + '時点）の状態に戻しますか？\n\n現在のデータは上書きされます（ただし復元直前の状態も自動でバックアップされるので、間違えてもさらに戻すことはできます）。')">
+                  <button class="btn secondary" type="submit" style="color:var(--red);border-color:var(--red);">⏪ このバックアップから復元</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
   <% } %>
 </div>
 

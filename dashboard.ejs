@@ -1,5 +1,5 @@
 <%- include('header', { title: '案件一覧' }) %>
-<div style="display:flex;justify-content:space-between;align-items:center;">
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
   <h1>案件一覧</h1>
   <div>
     <a class="btn secondary" href="/import">貼り付けインポート</a>
@@ -10,23 +10,25 @@
 <% if (upcomingDeadlines && upcomingDeadlines.length > 0) { %>
   <div class="card deadline-panel">
     <h2>⏰ 締切が近い項目（全案件横断・提出済み／対象外を除く）</h2>
-    <table>
-      <thead><tr><th>案件</th><th>項目</th><th>期限</th><th>状態</th></tr></thead>
-      <tbody>
-        <% upcomingDeadlines.slice(0, 20).forEach(d => { %>
-          <tr>
-            <td><a href="/projects/<%= d.projectId %>"><%= d.projectName %></a></td>
-            <td><%= d.label %></td>
-            <td>
-              <span class="due-badge due-<%= d.alert.level %>">
-                <%= new Date(d.dueDate).toLocaleDateString('ja-JP') %><% if (d.alert.daysRemaining < 0) { %>（期限超過）<% } %>
-              </span>
-            </td>
-            <td><%= STATUS_LABELS[d.status] || d.status %></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>案件</th><th>項目</th><th>期限</th><th>状態</th></tr></thead>
+        <tbody>
+          <% upcomingDeadlines.slice(0, 20).forEach(d => { %>
+            <tr>
+              <td><a href="/projects/<%= d.projectId %>"><%= d.projectName %></a></td>
+              <td><%= d.label %></td>
+              <td>
+                <span class="due-badge due-<%= d.alert.level %>">
+                  <%= new Date(d.dueDate).toLocaleDateString('ja-JP') %><% if (d.alert.daysRemaining < 0) { %>（期限超過）<% } %>
+                </span>
+              </td>
+              <td><%= STATUS_LABELS[d.status] || d.status %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
   </div>
 <% } %>
 
@@ -47,7 +49,7 @@
         <% if (s.scheduleMissing) { %>
           <span class="badge red">⚠ 工期未設定</span>
         <% } else { %>
-          🏗 着工 <%= s.project.construction_start_date.toISOString().slice(0,10) %> ／ 完工 <%= s.project.construction_end_date.toISOString().slice(0,10) %>
+          🏗 工期: <%= s.project.construction_start_date.toISOString().slice(0,10) %> 〜 <%= s.project.construction_end_date.toISOString().slice(0,10) %>
         <% } %>
       </div>
       <div class="stage"><%= s.currentStage %></div>
