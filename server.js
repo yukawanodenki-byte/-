@@ -453,7 +453,7 @@ app.get('/', requireAuth, async (req, res) => {
   maybeRunAutoBackup(pool).catch((e) => console.error('自動バックアップに失敗しました', e));
   const { summaries } = await computeProjectSummaries();
   const upcomingDeadlines = await computeUpcomingDeadlines();
-  res.render('dashboard', { summaries, upcomingDeadlines, STATUS_LABELS });
+  res.render('dashboard', { summaries, upcomingDeadlines, STATUS_LABELS, message: req.query.message || null });
 });
 
 // ---- 年間工程表（着工日〜完成期日ベース：施工期間と技術者の配置が一目でわかる） ----
@@ -761,11 +761,6 @@ app.get('/projects/:id', requireAuth, async (req, res) => {
     [projectId]
   );
   const { rows: techs } = await pool.query('SELECT * FROM project_technicians WHERE project_id = $1', [projectId]);
-  const { rows: activity } = await pool.query(
-    `SELECT a.*, u.display_name FROM activity_log a LEFT JOIN users u ON u.id = a.user_id
-     WHERE a.project_id = $1 ORDER BY a.created_at DESC LIMIT 20`,
-    [projectId]
-  );
   const users = await getUsersList();
 
   const statusMap = {};
@@ -798,7 +793,6 @@ app.get('/projects/:id', requireAuth, async (req, res) => {
     statusMap,
     docsMap,
     techMap,
-    activity,
     users,
     assigneeName,
     precedents,
@@ -874,6 +868,22 @@ app.post('/projects/:id/archive', requireAuth, async (req, res) => {
   await pool.query('UPDATE projects SET archived = true WHERE id = $1', [projectId]);
   await logActivity(projectId, req.session.userId, 'archive', '案件をアーカイブ');
   res.redirect('/');
+});
+
+// 案件の完全削除。誤操作対策として、削除する直前の全データ状態を自動でバックアップしてから
+// DELETE FROM projects を実行する（required_documents / checklist_status / project_technicians /
+// activity_log はいずれもON DELETE CASCADEなので、この1文で関連データもまとめて消える）。
+// 万一の誤削除は「バックアップ」ページの「案件削除直前の自動退避」から復元可能（ただし復元は
+// データベース全体を丸ごとその時点に戻す仕組みのため、他の案件への更新も一緒に巻き戻る点に注意）。
+app.post('/projects/:id/delete', requireAuth, async (req, res) => {
+  const projectId = Number(req.params.id);
+  const { rows } = await pool.query('SELECT name FROM projects WHERE id = $1', [projectId]);
+  const project = rows[0];
+  if (!project) return res.status(404).send('案件が見つかりません');
+
+  await createBackup(pool, 'pre_delete', req.session.userId);
+  await pool.query('DELETE FROM projects WHERE id = $1', [projectId]);
+  res.redirect('/?message=' + encodeURIComponent(`案件「${project.name}」を削除しました`));
 });
 
 // ---- ajax: checklist item ----

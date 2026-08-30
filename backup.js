@@ -23,14 +23,16 @@ async function snapshotData(pool) {
 }
 
 async function pruneBackups(pool) {
-  // 自動バックアップは直近14件、復元直前バックアップは直近5件のみ残す。手動バックアップは自動削除しない。
+  // 自動バックアップは直近14件、復元直前・案件削除直前バックアップは直近5件のみ残す。手動バックアップは自動削除しない。
   await pool.query(`
     DELETE FROM backups WHERE id IN (
       SELECT id FROM (
         SELECT id, kind, row_number() OVER (PARTITION BY kind ORDER BY created_at DESC) AS rn
         FROM backups
       ) t
-      WHERE (t.kind = 'auto' AND t.rn > 14) OR (t.kind = 'pre_restore' AND t.rn > 5)
+      WHERE (t.kind = 'auto' AND t.rn > 14)
+         OR (t.kind = 'pre_restore' AND t.rn > 5)
+         OR (t.kind = 'pre_delete' AND t.rn > 5)
     )
   `);
 }

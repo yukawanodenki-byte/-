@@ -368,8 +368,6 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); 
 .save-indicator { font-size: 12px; color: var(--muted); }
 .save-indicator.saved { color: var(--green); }
 
-.activity-log li { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-
 .helptext { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
 .form-grid { display: grid; gap: 12px; margin-top: 4px; }

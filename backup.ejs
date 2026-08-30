@@ -37,7 +37,9 @@
               <td>
                 <% if (b.kind === 'auto') { %>自動
                 <% } else if (b.kind === 'manual') { %>手動
-                <% } else { %>復元直前の自動退避
+                <% } else if (b.kind === 'pre_restore') { %>復元直前の自動退避
+                <% } else if (b.kind === 'pre_delete') { %>案件削除直前の自動退避
+                <% } else { %><%= b.kind %>
                 <% } %>
               </td>
               <td><%= b.project_count %>件</td>

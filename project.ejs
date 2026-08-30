@@ -74,6 +74,10 @@
       onsubmit="return confirm('この案件をアーカイブしますか？一覧から非表示になります。')">
       <button class="btn secondary" type="submit">アーカイブ</button>
     </form>
+    <form method="post" action="/projects/<%= project.id %>/delete" style="display:inline"
+      onsubmit="return confirm('本当に「<%= project.name %>」を完全に削除しますか？\n\nこの操作は元に戻せません（アーカイブと違い、案件のデータそのものが消えます）。削除前の状態は自動でバックアップされますが、復元するには「バックアップ」ページからデータベース全体を丸ごと過去の状態に戻す必要があり、他の案件への更新も一緒に巻き戻ってしまいます。\n\n本当によろしければOKを押してください。')">
+      <button class="btn secondary" type="submit" style="color:var(--red);border-color:var(--red);">🗑 完全に削除</button>
+    </form>
     <% if (project.folder_url) { %>
       <a class="btn secondary" href="<%= project.folder_url %>" target="_blank" rel="noopener">📁 共有フォルダを開く</a>
     <% } %>
@@ -160,16 +164,6 @@
       <% }) %>
     </details>
   <% }) %>
-</div>
-
-<div class="card">
-  <h2>更新履歴</h2>
-  <ul class="activity-log">
-    <% if (activity.length === 0) { %><li>まだ履歴がありません</li><% } %>
-    <% activity.forEach(a => { %>
-      <li><%= new Date(a.created_at).toLocaleString('ja-JP') %> — <%= a.display_name || '不明' %> — <%= a.detail || a.action %></li>
-    <% }) %>
-  </ul>
 </div>
 
 <%- include('footer') %>

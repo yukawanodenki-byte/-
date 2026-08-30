@@ -7,6 +7,10 @@
   </div>
 </div>
 
+<% if (message) { %>
+  <div class="card" style="border-color:var(--accent);"><%= message %></div>
+<% } %>
+
 <% if (upcomingDeadlines && upcomingDeadlines.length > 0) { %>
   <div class="card deadline-panel">
     <h2>⏰ 締切が近い項目（全案件横断・提出済み／対象外を除く）</h2>
