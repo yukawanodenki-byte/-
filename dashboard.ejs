@@ -67,7 +67,7 @@
         </span>
         <span>
           必須書類 <%= s.docDoneCount %>/<%= s.docTotalCount %>
-          <% if (s.docRevisingCount > 0) { %><span class="badge red">修正中 <%= s.docRevisingCount %></span><% } %>
+          <% if (s.docObtainingCount > 0) { %><span class="badge amber">取得中 <%= s.docObtainingCount %></span><% } %>
         </span>
       </div>
       <% if (s.dueRedCount > 0 || s.dueGreenCount > 0) { %>

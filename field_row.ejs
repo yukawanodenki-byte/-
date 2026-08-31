@@ -1,23 +1,28 @@
 <%
   // 汎用の1行コンポーネント。必須書類（kind='doc'）とチェックリスト項目（kind='item'）の
-  // どちらからも同じ見た目・同じJSで動かすための共通パーツ。
+  // どちらからも同じ見た目・同じJSで動かすための共通パーツ。ただしステータスの選択肢は、
+  // 必須書類＝3段階（未着手／取得中／保存済み）、チェックリスト項目＝5段階と異なるため、
+  // kindに応じて使う選択肢・文言を切り替える。
   const row = statusRow || { status: 'not_started' };
   const due = row.due_date ? row.due_date.toISOString().slice(0, 10) : '';
   const submittedAt = row.submitted_at ? row.submitted_at.toISOString().slice(0, 10) : '';
   const alertLevel = row.alertLevel || 'none';
+  const isDoc = kind === 'doc';
+  const rowStatusValues = isDoc ? DOC_STATUS_VALUES : STATUS_VALUES;
+  const rowStatusLabels = isDoc ? DOC_STATUS_LABELS : STATUS_LABELS;
 %>
 <div class="field-row" data-kind="<%= kind %>" data-project="<%= projectId %>" data-ref="<%= ref %>">
   <div class="field-row-head">
     <select class="status-select field-status">
-      <% STATUS_VALUES.forEach(function (sv) { %>
-        <option value="<%= sv %>" <%= row.status === sv ? 'selected' : '' %>><%= STATUS_LABELS[sv] %></option>
+      <% rowStatusValues.forEach(function (sv) { %>
+        <option value="<%= sv %>" <%= row.status === sv ? 'selected' : '' %>><%= rowStatusLabels[sv] %></option>
       <% }) %>
     </select>
     <span class="field-row-name"><%= label %></span>
     <% if (note) { %><span class="note">（<%= note %>）</span><% } %>
     <% if (alertLevel !== 'none') { %>
       <span class="due-badge due-<%= alertLevel %>">
-        <%= row.daysRemaining < 0 ? '期限超過' : (alertLevel === 'red' ? '提出間近' : 'まもなく期限') %>
+        <%= row.daysRemaining < 0 ? '期限超過' : (alertLevel === 'red' ? (isDoc ? '取得期限間近' : '提出間近') : 'まもなく期限') %>
       </span>
     <% } %>
     <% if (typeof extraLink !== 'undefined' && extraLink) { %>
@@ -29,11 +34,11 @@
     <label class="mini-label">期限（予定）
       <input type="date" class="field-due" value="<%= due %>">
     </label>
-    <label class="mini-label">提出日（実績）
+    <label class="mini-label"><%= isDoc ? '保存日（実績）' : '提出日（実績）' %>
       <input type="date" class="field-submitted-at" value="<%= submittedAt %>">
     </label>
-    <label class="mini-label">提出方法
-      <input type="text" class="field-submission-method" value="<%= row.submission_method || '' %>" placeholder="例: 郵送・持参・電子申請 等">
+    <label class="mini-label"><%= isDoc ? '取得方法' : '提出方法' %>
+      <input type="text" class="field-submission-method" value="<%= row.submission_method || '' %>" placeholder="<%= isDoc ? '例: 発注機関から郵送・契約時に受領 等' : '例: 郵送・持参・電子申請 等' %>">
     </label>
     <label class="mini-label">保存先リンク（ドラッグ＆ドロップ可）
       <input type="text" class="field-link dropzone" value="<%= row.link_url || '' %>" placeholder="共有サーバー上の保存先 or ファイル/フォルダをドラッグ">
@@ -64,7 +69,7 @@
   <% } %>
   <% if (precedents && precedents.length > 0) { %>
     <details class="precedent-box">
-      <summary>📋 同系統発注機関での提出実績（<%= precedents.length %>件）</summary>
+      <summary>📋 同系統発注機関での<%= isDoc ? '保存' : '提出' %>実績（<%= precedents.length %>件）</summary>
       <ul>
         <% precedents.forEach(function (pr) { %>
           <li><a href="/projects/<%= pr.projectId %>" target="_blank"><%= pr.projectName %></a> — <%= pr.updatedByName %>（<%= new Date(pr.updatedAt).toLocaleDateString('ja-JP') %>）</li>

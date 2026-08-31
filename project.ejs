@@ -130,10 +130,11 @@
       description: REQUIRED_DOC_DESCRIPTIONS[key],
       statusRow: row, precedents: precedentList,
       STATUS_VALUES: STATUS_VALUES, STATUS_LABELS: STATUS_LABELS,
+      DOC_STATUS_VALUES: DOC_STATUS_VALUES, DOC_STATUS_LABELS: DOC_STATUS_LABELS,
       extraLink: key === 'uchiwakesho' ? { href: '/templates', label: '📄 雛形をプレビュー' } : null,
     }) %>
   <% }) %>
-  <p class="helptext">ステータスは「未着手／作成中／提出済み／修正中／対象外」の5段階です。提出の必要がない書類は「対象外」を選び、根拠欄に理由を記入してください。「期限」は提出予定日、「提出日」は実際に提出できた日です（ステータスを「提出済み」に変えると、提出日が未入力なら自動で今日の日付が入ります。違う日に提出した場合は手で直してください）。リンク欄には共有サーバー上の保存先（フォルダ/ファイルのパスやURL）を入力してください。ファイルそのものはこの画面には保存されません。</p>
+  <p class="helptext">ステータスは「未着手／取得中／保存済み」の3段階です（発注機関からの受領・保管状況の確認が目的のため、チェックリストとは異なる段階になっています）。「期限」は取得予定日、「保存日」は実際に保存できた日です（ステータスを「保存済み」に変えると、保存日が未入力なら自動で今日の日付が入ります。違う日の場合は手で直してください）。リンク欄には共有サーバー上の保存先（フォルダ/ファイルのパスやURL）を入力してください。ファイルそのものはこの画面には保存されません。</p>
 </div>
 
 <div class="card">
@@ -160,6 +161,7 @@
           description: item.description,
           statusRow: row, precedents: precedentList,
           STATUS_VALUES: STATUS_VALUES, STATUS_LABELS: STATUS_LABELS,
+          DOC_STATUS_VALUES: DOC_STATUS_VALUES, DOC_STATUS_LABELS: DOC_STATUS_LABELS,
         }) %>
       <% }) %>
     </details>

@@ -279,6 +279,15 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); 
   background: color-mix(in srgb, var(--purple) 18%, var(--card)); color: var(--purple);
   border-color: color-mix(in srgb, var(--purple) 40%, var(--card));
 }
+/* 必須書類専用の3段階（未着手／取得中／保存済み）。取得中はin_progressと、保存済みはsubmittedと同系色 */
+.status-select.status-obtaining {
+  background: color-mix(in srgb, var(--amber) 18%, var(--card)); color: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 40%, var(--card));
+}
+.status-select.status-saved {
+  background: color-mix(in srgb, var(--green) 18%, var(--card)); color: var(--green);
+  border-color: color-mix(in srgb, var(--green) 40%, var(--card));
+}
 
 /* 必須書類・チェックリスト項目 共通の1行コンポーネント（field_row.ejs） */
 .field-row {
@@ -294,6 +303,8 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); 
 .field-row:has(.status-select.status-submitted) { border-left-color: var(--green); }
 .field-row:has(.status-select.status-revising) { border-left-color: var(--red); }
 .field-row:has(.status-select.status-not_applicable) { border-left-color: var(--purple); }
+.field-row:has(.status-select.status-obtaining) { border-left-color: var(--amber); }
+.field-row:has(.status-select.status-saved) { border-left-color: var(--green); }
 .field-row-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .field-row-name { font-weight: 600; }
 .field-row-head .note { color: var(--muted); font-size: 12px; }

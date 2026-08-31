@@ -199,7 +199,7 @@ const REQUIRED_DOC_DESCRIPTIONS = {
   uchiwakesho: '契約金額の内訳（材料費・労務費・諸経費など）を示す書類です。',
 };
 
-// ステータス5段階：未着手／作成中／提出済み／修正中／対象外（提出不要）
+// チェックリスト項目のステータス5段階：未着手／作成中／提出済み／修正中／対象外（提出不要）
 const STATUS_VALUES = ['not_started', 'in_progress', 'submitted', 'revising', 'not_applicable'];
 const STATUS_LABELS = {
   not_started: '未着手',
@@ -212,13 +212,27 @@ function normalizeStatus(v) {
   return STATUS_VALUES.includes(v) ? v : 'not_started';
 }
 
+// 必須書類のステータス3段階：未着手／取得中／保存済み。
+// 必須書類はチェックリストと違い「発注機関から受領・保管する書類の保存状況の確認」が目的のため、
+// 「提出」ベースの5段階ではなく、より実態に合った3段階で管理する（2026年8月〜）。
+const DOC_STATUS_VALUES = ['not_started', 'obtaining', 'saved'];
+const DOC_STATUS_LABELS = {
+  not_started: '未着手',
+  obtaining: '取得中',
+  saved: '保存済み',
+};
+function normalizeDocStatus(v) {
+  return DOC_STATUS_VALUES.includes(v) ? v : 'not_started';
+}
+
 // ---- 提出期限アラート ----
 // 「2週間前は緑色、1週間前から赤色」という要望に沿い、期限までの残日数で判定する。
 // 残り14日以内になったら緑、残り7日未満（=1週間を切った、または期限超過）になったら赤。
-// 15日以上先、期限日未設定、提出済み／対象外の項目にはアラートを出さない。
+// 15日以上先、期限日未設定、完了扱い（チェックリスト＝提出済み／対象外、必須書類＝保存済み）の
+// 項目にはアラートを出さない。
 function computeDueAlert(dueDate, status) {
   if (!dueDate) return { level: 'none', daysRemaining: null };
-  if (status === 'submitted' || status === 'not_applicable') return { level: 'none', daysRemaining: null };
+  if (status === 'submitted' || status === 'not_applicable' || status === 'saved') return { level: 'none', daysRemaining: null };
   const due = new Date(dueDate);
   const now = new Date();
   const dueUTC = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
@@ -276,7 +290,7 @@ async function computePrecedents(currentProjectId, groupKey) {
   const { rows: docRows } = await pool.query(
     `SELECT rd.project_id, rd.doc_key, rd.updated_at, u.display_name
      FROM required_documents rd LEFT JOIN users u ON u.id = rd.updated_by
-     WHERE rd.status = 'submitted' AND rd.project_id = ANY($1::int[])`,
+     WHERE rd.status = 'saved' AND rd.project_id = ANY($1::int[])`,
     [matchingIds]
   );
 
@@ -371,8 +385,8 @@ async function computeProjectSummaries() {
     }
 
     const docStatusRows = docsByProject[p.id] || {};
-    const docDoneCount = REQUIRED_DOC_KEYS.filter((k) => (docStatusRows[k] || {}).status === 'submitted').length;
-    const docRevisingCount = REQUIRED_DOC_KEYS.filter((k) => (docStatusRows[k] || {}).status === 'revising').length;
+    const docDoneCount = REQUIRED_DOC_KEYS.filter((k) => (docStatusRows[k] || {}).status === 'saved').length;
+    const docObtainingCount = REQUIRED_DOC_KEYS.filter((k) => (docStatusRows[k] || {}).status === 'obtaining').length;
 
     // 締切アラート（案件一覧からもすぐわかるように件数を集計）
     let dueRedCount = 0;
@@ -406,7 +420,7 @@ async function computeProjectSummaries() {
       naItems,
       currentStage: currentCategory ? currentCategory.name : '-',
       docDoneCount,
-      docRevisingCount,
+      docObtainingCount,
       docTotalCount: REQUIRED_DOC_KEYS.length,
       technicians: techsByProject[p.id] || [],
       overlapBadge,
@@ -435,7 +449,7 @@ async function computeUpcomingDeadlines() {
      FROM required_documents rd
      JOIN projects p ON p.id = rd.project_id
      WHERE rd.due_date IS NOT NULL AND p.archived = false
-       AND rd.status NOT IN ('submitted', 'not_applicable')`
+       AND rd.status NOT IN ('saved')`
   );
   const combined = [
     ...itemRows.map((r) => ({ projectId: r.project_id, projectName: r.project_name, label: r.label, dueDate: r.due_date, status: r.status })),
@@ -453,7 +467,12 @@ app.get('/', requireAuth, async (req, res) => {
   maybeRunAutoBackup(pool).catch((e) => console.error('自動バックアップに失敗しました', e));
   const { summaries } = await computeProjectSummaries();
   const upcomingDeadlines = await computeUpcomingDeadlines();
-  res.render('dashboard', { summaries, upcomingDeadlines, STATUS_LABELS, message: req.query.message || null });
+  res.render('dashboard', {
+    summaries,
+    upcomingDeadlines,
+    STATUS_LABELS: { ...STATUS_LABELS, ...DOC_STATUS_LABELS },
+    message: req.query.message || null,
+  });
 });
 
 // ---- 年間工程表（着工日〜完成期日ベース：施工期間と技術者の配置が一目でわかる） ----
@@ -802,6 +821,8 @@ app.get('/projects/:id', requireAuth, async (req, res) => {
     REQUIRED_DOC_DESCRIPTIONS,
     STATUS_VALUES,
     STATUS_LABELS,
+    DOC_STATUS_VALUES,
+    DOC_STATUS_LABELS,
   });
 });
 
@@ -975,8 +996,8 @@ app.post('/api/projects/:id/items/:itemId/submission', requireAuth, async (req, 
 app.post('/api/projects/:id/documents/:docKey/status', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
   const docKey = req.params.docKey;
-  const status = normalizeStatus(req.body.status);
-  const obtained = status === 'submitted'; // 旧カラムも一応揃えておく（互換用）
+  const status = normalizeDocStatus(req.body.status);
+  const obtained = status === 'saved'; // 旧カラムも一応揃えておく（互換用）
   await pool.query(
     `INSERT INTO required_documents (project_id, doc_key, status, obtained, updated_by, updated_at)
      VALUES ($1,$2,$3,$4,$5, now())

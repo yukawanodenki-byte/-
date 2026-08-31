@@ -26,7 +26,7 @@
     return res;
   }
 
-  const STATUS_CLASSES = ['status-not_started', 'status-in_progress', 'status-submitted', 'status-revising', 'status-not_applicable'];
+  const STATUS_CLASSES = ['status-not_started', 'status-in_progress', 'status-submitted', 'status-revising', 'status-not_applicable', 'status-obtaining', 'status-saved'];
   function applyStatusClass(selectEl) {
     selectEl.classList.remove(...STATUS_CLASSES);
     selectEl.classList.add('status-' + selectEl.value);
@@ -62,13 +62,15 @@
       });
     }
 
+    // 必須書類（doc）は「保存済み」、チェックリスト項目（item）は「提出済み」が完了扱いの値
+    const terminalStatus = row.dataset.kind === 'doc' ? 'saved' : 'submitted';
     if (statusSel) {
       statusSel.addEventListener('change', () => {
         applyStatusClass(statusSel);
         if (noteWrap) noteWrap.style.display = statusSel.value === 'not_applicable' ? '' : 'none';
         postJSON(`${base}/status`, { status: statusSel.value });
-        // 「提出済み」に変えたのに提出日が空なら、今日の日付を自動で入れておく（入れ忘れ防止。手で修正も可能）
-        if (statusSel.value === 'submitted' && submittedAtInput && !submittedAtInput.value) {
+        // 完了扱いの値に変えたのに実績日が空なら、今日の日付を自動で入れておく（入れ忘れ防止。手で修正も可能）
+        if (statusSel.value === terminalStatus && submittedAtInput && !submittedAtInput.value) {
           submittedAtInput.value = new Date().toISOString().slice(0, 10);
           saveSubmission();
         }

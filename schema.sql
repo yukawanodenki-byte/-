@@ -83,9 +83,18 @@ ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS request_detail TEXT;    
 -- 実際に提出できた日・提出方法（期限＝予定、提出日＝実績、として区別する）
 ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS submitted_at DATE;         -- 提出日（実績）
 ALTER TABLE required_documents ADD COLUMN IF NOT EXISTS submission_method TEXT;    -- 提出方法（例: 郵送・持参・電子申請等）
+-- 必須書類のステータスを5段階→3段階（未着手／取得中／保存済み）に変更（2026年8月）。
+-- 「必須書類」は発注機関から受領・保管する書類の保存状況を確認する欄のため、チェックリスト項目と
+-- 同じ「提出」ベースの5段階ではなく、実態に合った3段階に簡素化した。既存データは以下で変換する
+-- （何度実行しても安全なUPDATE。旧値が無ければ何も起きない）。
+-- 注意：旧の5段階CHECK制約が残ったままだと、下のUPDATEで新しい値（obtaining/saved）に更新した
+-- 瞬間にその旧制約へ違反してしまうため、必ず先にDROP CONSTRAINTしてからUPDATEする順序にすること。
 ALTER TABLE required_documents DROP CONSTRAINT IF EXISTS required_documents_status_check;
+UPDATE required_documents SET status = 'obtaining' WHERE status IN ('in_progress', 'revising');
+UPDATE required_documents SET status = 'saved' WHERE status = 'submitted';
+UPDATE required_documents SET status = 'not_started' WHERE status = 'not_applicable';
 ALTER TABLE required_documents ADD CONSTRAINT required_documents_status_check
-  CHECK (status IN ('not_started','in_progress','submitted','revising','not_applicable'));
+  CHECK (status IN ('not_started','obtaining','saved'));
 
 -- チェックリスト項目カタログ（区分①〜⑦、データ駆動＝コード側のCATEGORIES定義から起動時に同期される）
 CREATE TABLE IF NOT EXISTS checklist_categories (
