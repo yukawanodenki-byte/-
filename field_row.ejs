@@ -38,8 +38,8 @@
     <label class="mini-label">保存先リンク（ドラッグ＆ドロップ可）
       <input type="text" class="field-link dropzone" value="<%= row.link_url || '' %>" placeholder="共有サーバー上の保存先 or ファイル/フォルダをドラッグ">
     </label>
-    <a class="btn secondary field-open-link" href="<%= row.link_url || '#' %>" target="_blank" rel="noopener"
-      style="<%= row.link_url ? '' : 'visibility:hidden' %>">開く</a>
+    <button type="button" class="btn secondary field-open-link"
+      style="<%= row.link_url ? '' : 'visibility:hidden' %>">開く</button>
   </div>
   <div class="field-note-wrap" style="<%= row.status === 'not_applicable' ? '' : 'display:none' %>">
     <label class="mini-label">対象外とする根拠</label>
