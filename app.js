@@ -34,7 +34,7 @@
   // 貼り付けてもらう方式にする。保存先リンク欄（field-row）・共有フォルダのリンク（案件詳細・
   // 案件一覧カード）のどちらでも同じロジックを使う。
   function isWebUrl(v) {
-    return /^https?:\/\//i.test(v);
+    return /^(https?:|mailto:)/i.test(v);
   }
   function applySmartLinkMode(btn, val) {
     if (!val) {
@@ -74,6 +74,40 @@
     btn.addEventListener('click', (e) => {
       e.stopPropagation(); // 案件一覧カード（外側がリンク）の中にあるため、カード自体への遷移を止める
       handleSmartLinkClick(btn, val);
+    });
+  });
+
+  // ---- やり取り履歴の各記録に付けたリンク（メールへのリンク等）----
+  document.querySelectorAll('.contact-open-link').forEach((btn) => {
+    const val = (btn.dataset.value || '').trim();
+    applySmartLinkMode(btn, val);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleSmartLinkClick(btn, val);
+    });
+  });
+
+  // ---- 低入札トグルボタン（案件追加フォーム／案件詳細の基本情報）----
+  // 案件詳細ページ（data-autosave="project"）ではクリック時にすぐサーバーへ反映する。
+  // 案件追加フォームではhidden inputの値がそのままフォーム送信される。
+  document.querySelectorAll('.lowbid-toggle-wrap').forEach((wrap) => {
+    const btn = wrap.querySelector('.lowbid-toggle-btn');
+    const input = wrap.querySelector('.lowbid-toggle-input');
+    const help = wrap.querySelector('.lowbid-toggle-help');
+    if (!btn || !input) return;
+    function render() {
+      const active = input.value === 'true';
+      btn.classList.toggle('active', active);
+      btn.textContent = active ? '✅ 低入札案件（解除する場合はクリック）' : '🔻 低入札案件として登録';
+      if (help) help.style.display = active ? '' : 'none';
+    }
+    render();
+    btn.addEventListener('click', () => {
+      input.value = input.value === 'true' ? 'false' : 'true';
+      render();
+      if (wrap.dataset.autosave === 'project' && wrap.dataset.project) {
+        postJSON(`/api/projects/${wrap.dataset.project}/low-bid`, { is_low_bid: input.value });
+      }
     });
   });
 

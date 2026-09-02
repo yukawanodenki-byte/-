@@ -1,7 +1,7 @@
 <%- include('header', { title: project.name }) %>
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
   <div>
-    <h1><%= project.name %></h1>
+    <h1><%= project.name %><% if (project.is_low_bid) { %><span class="lowbid-badge">🔻 低入札</span><% } %></h1>
     <div class="assignee">👤 作成担当者: <%= assigneeName || '未設定' %><% if (agencyGroupKey) { %> ／ 発注機関系統: <%= agencyGroupKey %><% } %></div>
   </div>
   <span class="save-indicator" id="saveIndicator"></span>
@@ -11,6 +11,9 @@
 <% if (message) { %>
   <div class="card" style="border-color:var(--accent);"><%= message %></div>
 <% } %>
+
+<div class="project-layout">
+<div class="project-main-col">
 
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -73,6 +76,13 @@
     <label>郵送物の送り先</label>
     <textarea name="mailing_address" class="basic-info-field" rows="2" placeholder="書類等を郵送する際の宛先住所・部署名"><%= project.mailing_address || '' %></textarea>
   </div>
+
+  <div class="lowbid-toggle-wrap" data-autosave="project" data-project="<%= project.id %>" style="margin-top:16px;">
+    <button type="button" class="btn secondary lowbid-toggle-btn">🔻 低入札案件として登録</button>
+    <input type="hidden" class="lowbid-toggle-input" value="<%= project.is_low_bid ? 'true' : 'false' %>">
+    <p class="helptext lowbid-toggle-help" style="display:none;">低入札価格調査で一般的に求められる書類（16項目）を、必須書類とは別の専用リストとしてこの案件に追加しています。実際に必要な書類は発注機関の指示に必ず従って確認してください。</p>
+  </div>
+
   <div style="margin-top:16px;">
     <form method="post" action="/projects/<%= project.id %>/archive" style="display:inline"
       onsubmit="return confirm('この案件をアーカイブしますか？一覧から非表示になります。')">
@@ -142,6 +152,27 @@
   <p class="helptext">ステータスは「未着手／取得中／保存済み」の3段階です（発注機関からの受領・保管状況の確認が目的のため、チェックリストとは異なる段階になっています）。「期限」は取得予定日、「保存日」は実際に保存できた日です（ステータスを「保存済み」に変えると、保存日が未入力なら自動で今日の日付が入ります。違う日の場合は手で直してください）。リンク欄には共有サーバー上の保存先（フォルダ/ファイルのパスやURL）を入力してください。ファイルそのものはこの画面には保存されません。</p>
 </div>
 
+<% if (project.is_low_bid) { %>
+<div class="card">
+  <h2>低入札価格調査 関連書類<span class="lowbid-badge">🔻 低入札</span></h2>
+  <p class="helptext">低入札価格調査で一般的に求められる書類の標準チェックリストです（国土交通省・日本下水道事業団等の公開様式を参考に作成）。<strong>実際に必要な書類・様式は発注機関・案件により異なるため、必ず当該案件の入札説明書・発注機関からの提出依頼と突き合わせて確認してください。</strong>ステータス・期限・保存先リンクの使い方は上の「必須書類」欄と同じです。</p>
+  <% LOW_BID_DOC_KEYS.forEach(key => {
+    const row = docsMap[key] || { status: 'not_started' };
+    const precedentList = (precedents.docMap || {})[key] || [];
+  %>
+    <%- include('field_row', {
+      kind: 'doc', ref: key, projectId: project.id,
+      label: LOW_BID_DOC_LABELS[key], note: null,
+      description: LOW_BID_DOC_DESCRIPTIONS[key],
+      statusRow: row, precedents: precedentList,
+      STATUS_VALUES: STATUS_VALUES, STATUS_LABELS: STATUS_LABELS,
+      DOC_STATUS_VALUES: DOC_STATUS_VALUES, DOC_STATUS_LABELS: DOC_STATUS_LABELS,
+      extraLink: null,
+    }) %>
+  <% }) %>
+</div>
+<% } %>
+
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <h2>チェックリスト</h2>
@@ -173,11 +204,15 @@
   <% }) %>
 </div>
 
+</div>
+<!-- /project-main-col -->
+
+<div class="project-side-col">
 <div class="card" id="contacts">
   <h2>発注機関とのやり取り履歴</h2>
-  <p class="helptext">電話・メール等でのやり取りを時系列で記録しておく欄です。「こちらから」「相手から」を選んでおくと、川野電気がアクションしたか・その後返信があったかが一覧で見返せます。</p>
+  <p class="helptext">電話・メール等でのやり取りを時系列で記録しておく欄です。「こちらから」「相手から」を選んでおくと、川野電気がアクションしたか・その後返信があったかが一覧で見返せます。リンク欄にはメールへのリンク（Gmailのメッセージリンク等）やmailto:リンクも貼り付けられます。</p>
 
-  <form method="post" action="/projects/<%= project.id %>/contacts" class="form-grid form-grid-2" style="margin-bottom:16px;">
+  <form method="post" action="/projects/<%= project.id %>/contacts" style="margin-bottom:16px;display:flex;flex-direction:column;gap:10px;">
     <div>
       <label>日付</label>
       <input type="date" name="contact_date" required value="<%= new Date().toISOString().slice(0,10) %>">
@@ -202,11 +237,15 @@
       <label>相手（氏名・部署等）</label>
       <input type="text" name="counterpart" placeholder="例: 契約担当 〇〇様">
     </div>
-    <div style="grid-column:1/-1;">
+    <div>
       <label>内容</label>
       <textarea name="summary" rows="2" required placeholder="やり取りの内容を記入してください"></textarea>
     </div>
-    <div style="grid-column:1/-1;">
+    <div>
+      <label>リンク（メールへのリンク等・任意）</label>
+      <input type="text" name="link_url" placeholder="例: メールの共有リンク、mailto:... など">
+    </div>
+    <div>
       <button class="btn" type="submit">＋ 記録を追加</button>
     </div>
   </form>
@@ -224,6 +263,9 @@
             <% if (c.counterpart) { %><span class="contact-counterpart"><%= c.counterpart %></span><% } %>
           </div>
           <p class="contact-summary"><%= c.summary %></p>
+          <% if (c.link_url) { %>
+            <button type="button" class="contact-open-link" data-value="<%= c.link_url %>" data-open-label="🔗 リンクを開く">🔗 リンクを開く</button>
+          <% } %>
           <div class="contact-entry-foot">
             <span class="contact-meta">記録: <%= c.created_by_name || '（不明）' %> ・ <%= new Date(c.created_at).toLocaleString('ja-JP') %></span>
             <form method="post" action="/projects/<%= project.id %>/contacts/<%= c.id %>/delete" style="display:inline"
@@ -236,5 +278,10 @@
     </div>
   <% } %>
 </div>
+</div>
+<!-- /project-side-col -->
+
+</div>
+<!-- /project-layout -->
 
 <%- include('footer') %>

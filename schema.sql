@@ -43,6 +43,8 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS contract_officer_phone TEXT;     -
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS supervisor_name TEXT;           -- 監督職員の氏名
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS supervisor_phone TEXT;          -- 監督職員の電話番号
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS mailing_address TEXT;           -- 郵送物の送り先
+-- 低入札価格調査の対象案件かどうか（対象の場合、専用の追加書類16件を required_documents に持つ）
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_low_bid BOOLEAN NOT NULL DEFAULT false;
 
 -- 体制・工程（監理技術者／主任技術者／現場代理人）。1案件につき役割ごとに1行。
 CREATE TABLE IF NOT EXISTS project_technicians (
@@ -73,6 +75,7 @@ CREATE TABLE IF NOT EXISTS agency_contacts (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE agency_contacts ADD COLUMN IF NOT EXISTS direction TEXT NOT NULL DEFAULT 'outgoing';
+ALTER TABLE agency_contacts ADD COLUMN IF NOT EXISTS link_url TEXT;  -- 関連リンク（メールへのリンク等。任意）
 ALTER TABLE agency_contacts DROP CONSTRAINT IF EXISTS agency_contacts_method_check;
 ALTER TABLE agency_contacts ADD CONSTRAINT agency_contacts_method_check
   CHECK (method IN ('phone','email','other'));

@@ -18,6 +18,13 @@
         <option value="<%= u.id %>"><%= u.display_name %></option>
       <% }) %>
     </select>
+
+    <div class="lowbid-toggle-wrap" style="margin-top:16px;">
+      <button type="button" class="btn secondary lowbid-toggle-btn">🔻 低入札案件として登録</button>
+      <input type="hidden" name="is_low_bid" class="lowbid-toggle-input" value="false">
+      <p class="helptext lowbid-toggle-help" style="display:none;">低入札価格調査で一般的に求められる書類（16項目）を、必須書類とは別の専用リストとして案件詳細ページに追加します。実際に必要な書類は発注機関の指示に必ず従って確認してください。落札後に低入札対象と判明した場合は、案件詳細ページの基本情報からも後で切り替えられます。</p>
+    </div>
+
     <div style="margin-top:16px;">
       <button class="btn" type="submit">作成</button>
       <a class="btn secondary" href="/">キャンセル</a>

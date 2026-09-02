@@ -199,6 +199,56 @@ const REQUIRED_DOC_DESCRIPTIONS = {
   uchiwakesho: '契約金額の内訳（材料費・労務費・諸経費など）を示す書類です。',
 };
 
+// ---- 低入札価格調査 関連書類（低入札案件のみ・16種類固定） ----
+// 国土交通省（地方整備局・航空局）や日本下水道事業団が公表している低入札価格調査の提出資料様式を
+// 参考に整理した一般的なリスト（2026年9月時点でのWeb公開情報に基づく）。実際に求められる書類・様式は
+// 発注機関・案件により異なるため、必ず当該案件の入札説明書・低入札価格調査資料の提出依頼と突き合わせて
+// 確認すること（このリストはあくまで「抜け漏れを防ぐための標準チェックリスト」）。
+const LOW_BID_DOC_KEYS = [
+  'lb_reason', 'lb_cost_breakdown', 'lb_cost_detail', 'lb_execution_org_chart',
+  'lb_safety_council', 'lb_ongoing_works', 'lb_assigned_engineers', 'lb_office_warehouse',
+  'lb_materials_stock', 'lb_material_suppliers', 'lb_equipment_stock', 'lb_labor_plan',
+  'lb_past_works', 'lb_waste_disposal', 'lb_financials', 'lb_summary',
+];
+const LOW_BID_DOC_LABELS = {
+  lb_reason: '当該価格で入札した理由',
+  lb_cost_breakdown: '積算内訳書',
+  lb_cost_detail: '積算内訳の明細書',
+  lb_execution_org_chart: '施工体制台帳',
+  lb_safety_council: '工事作業所災害防止協議会 兼 施工体系図',
+  lb_ongoing_works: '手持ち工事の状況',
+  lb_assigned_engineers: '配置予定技術者名簿',
+  lb_office_warehouse: '契約対象工事箇所と事務所・倉庫等との関連',
+  lb_materials_stock: '手持ち資材の状況',
+  lb_material_suppliers: '資材購入先一覧',
+  lb_equipment_stock: '手持ち機械の状況',
+  lb_labor_plan: '労務者の確保計画（供給見通し）',
+  lb_past_works: '過去に施工した公共工事名及び発注者',
+  lb_waste_disposal: '建設副産物の搬出地',
+  lb_financials: '経営内容（経営規模等評価結果通知書・直近の財務諸表）',
+  lb_summary: '低入札価格調査資料の概要',
+};
+const LOW_BID_DOC_DESCRIPTIONS = {
+  lb_reason: 'なぜこの価格で入札できたのかを説明する書類です。',
+  lb_cost_breakdown: '入札価格の積算根拠を示す内訳書です。',
+  lb_cost_detail: '積算内訳書の各項目について、さらに詳しい明細を示す書類です。',
+  lb_execution_org_chart: '下請業者を含めた施工体制を示す台帳です。',
+  lb_safety_council: '工事現場の災害防止協議会の体制と、下請を含む施工体系図です。',
+  lb_ongoing_works: '現在施工中の他の工事の状況一覧です（この工事に人員・機材を割ける余力を示すための資料）。',
+  lb_assigned_engineers: 'この工事に配置予定の技術者（監理技術者等）の名簿です。',
+  lb_office_warehouse: '工事箇所と自社の事務所・倉庫等との位置関係・距離を示す資料です。',
+  lb_materials_stock: '現在手持ちしている資材の状況です。',
+  lb_material_suppliers: '主要な資材の購入先一覧です。',
+  lb_equipment_stock: '現在手持ちしている施工機械の状況です。',
+  lb_labor_plan: '工事に必要な労務者をどう確保するかの計画です。',
+  lb_past_works: '過去に施工した公共工事の名称と発注者の一覧です（施工実績の裏付け）。',
+  lb_waste_disposal: '工事で出る建設副産物（廃材等）の搬出先です。',
+  lb_financials: '会社の経営状況を示す資料です（経営規模等評価結果通知書・直近の財務諸表等）。',
+  lb_summary: '調査資料全体の概要をまとめた書類です。',
+};
+// 締切アラート等、必須書類・低入札書類を横断してラベルを引くための結合辞書
+const ALL_DOC_LABELS = { ...REQUIRED_DOC_LABELS, ...LOW_BID_DOC_LABELS };
+
 // チェックリスト項目のステータス5段階：未着手／作成中／提出済み／修正中／対象外（提出不要）
 const STATUS_VALUES = ['not_started', 'in_progress', 'submitted', 'revising', 'not_applicable'];
 const STATUS_LABELS = {
@@ -465,7 +515,7 @@ async function computeUpcomingDeadlines() {
   );
   const combined = [
     ...itemRows.map((r) => ({ projectId: r.project_id, projectName: r.project_name, label: r.label, dueDate: r.due_date, status: r.status })),
-    ...docRows.map((r) => ({ projectId: r.project_id, projectName: r.project_name, label: REQUIRED_DOC_LABELS[r.doc_key], dueDate: r.due_date, status: r.status })),
+    ...docRows.map((r) => ({ projectId: r.project_id, projectName: r.project_name, label: ALL_DOC_LABELS[r.doc_key] || r.doc_key, dueDate: r.due_date, status: r.status })),
   ];
   return combined
     .map((r) => ({ ...r, alert: computeDueAlert(r.dueDate, r.status) }))
@@ -717,23 +767,48 @@ app.get('/projects/new', requireAuth, async (req, res) => {
 
 app.post('/projects', requireAuth, async (req, res) => {
   const { name, agency, contract_amount, period_text, assignee_user_id } = req.body;
+  const isLowBid = req.body.is_low_bid === 'true';
   if (!name || !name.trim()) {
     const users = await getUsersList();
     return res.render('project_new', { error: '案件名は必須です。', users });
   }
   const { rows } = await pool.query(
-    'INSERT INTO projects (name, agency, contract_amount, period_text, assignee_user_id, updated_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
-    [name.trim(), agency || null, contract_amount || null, period_text || null, assignee_user_id ? Number(assignee_user_id) : null, req.session.userId]
+    'INSERT INTO projects (name, agency, contract_amount, period_text, assignee_user_id, is_low_bid, updated_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+    [name.trim(), agency || null, contract_amount || null, period_text || null, assignee_user_id ? Number(assignee_user_id) : null, isLowBid, req.session.userId]
   );
   const projectId = rows[0].id;
   for (const key of REQUIRED_DOC_KEYS) {
     await pool.query('INSERT INTO required_documents (project_id, doc_key) VALUES ($1,$2)', [projectId, key]);
   }
+  if (isLowBid) {
+    for (const key of LOW_BID_DOC_KEYS) {
+      await pool.query('INSERT INTO required_documents (project_id, doc_key) VALUES ($1,$2)', [projectId, key]);
+    }
+  }
   for (const role of ['監理技術者', '主任技術者', '現場代理人']) {
     await pool.query('INSERT INTO project_technicians (project_id, role) VALUES ($1,$2)', [projectId, role]);
   }
-  await logActivity(projectId, req.session.userId, 'create', `案件「${name}」を作成`);
+  await logActivity(projectId, req.session.userId, 'create', `案件「${name}」を作成${isLowBid ? '（低入札）' : ''}`);
   res.redirect('/projects/' + projectId);
+});
+
+// 低入札フラグの切り替え（案件詳細ページの基本情報から）。ONにした瞬間、まだ無ければ
+// 低入札価格調査 関連書類16件をこの案件に追加する（既にあれば何もしない＝ON/OFFを繰り返しても
+// 既存の入力内容は消えない）。OFFにしても行自体は削除しない（誤操作でのデータ消失を避けるため）。
+app.post('/api/projects/:id/low-bid', requireAuth, async (req, res) => {
+  const projectId = Number(req.params.id);
+  const isLowBid = req.body.is_low_bid === 'true' || req.body.is_low_bid === true;
+  await pool.query('UPDATE projects SET is_low_bid=$1, updated_at=now(), updated_by=$2 WHERE id=$3', [isLowBid, req.session.userId, projectId]);
+  if (isLowBid) {
+    for (const key of LOW_BID_DOC_KEYS) {
+      await pool.query(
+        'INSERT INTO required_documents (project_id, doc_key) VALUES ($1,$2) ON CONFLICT (project_id, doc_key) DO NOTHING',
+        [projectId, key]
+      );
+    }
+  }
+  await logActivity(projectId, req.session.userId, 'update_info', isLowBid ? '低入札案件として登録' : '低入札の指定を解除');
+  res.json({ ok: true });
 });
 
 // 貼り付けインポート: 「案件名: 〇〇」形式の行テキストから複数案件を一括作成
@@ -843,6 +918,9 @@ app.get('/projects/:id', requireAuth, async (req, res) => {
     REQUIRED_DOC_KEYS,
     REQUIRED_DOC_LABELS,
     REQUIRED_DOC_DESCRIPTIONS,
+    LOW_BID_DOC_KEYS,
+    LOW_BID_DOC_LABELS,
+    LOW_BID_DOC_DESCRIPTIONS,
     STATUS_VALUES,
     STATUS_LABELS,
     DOC_STATUS_VALUES,
@@ -934,16 +1012,16 @@ app.post('/projects/:id/delete', requireAuth, async (req, res) => {
 // ---- 発注機関とのやり取り履歴（電話・メール等） ----
 app.post('/projects/:id/contacts', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
-  const { contact_date, method, direction, counterpart, summary } = req.body;
+  const { contact_date, method, direction, counterpart, summary, link_url } = req.body;
   if (!contact_date || !summary || !summary.trim()) {
     return res.redirect(`/projects/${projectId}?message=` + encodeURIComponent('日付と内容は必須です') + '#contacts');
   }
   await pool.query(
-    `INSERT INTO agency_contacts (project_id, contact_date, method, direction, counterpart, summary, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    `INSERT INTO agency_contacts (project_id, contact_date, method, direction, counterpart, summary, link_url, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
     [
       projectId, contact_date, normalizeContactMethod(method), normalizeContactDirection(direction),
-      (counterpart || '').trim() || null, summary.trim(), req.session.userId,
+      (counterpart || '').trim() || null, summary.trim(), (link_url || '').trim() || null, req.session.userId,
     ]
   );
   res.redirect(`/projects/${projectId}#contacts`);
