@@ -1,4 +1,4 @@
-// バックアップ機能：案件・書類・チェックリスト・体制・更新履歴を丸ごとJSONスナップショットとして
+// バックアップ機能：案件・書類・チェックリスト・体制・やり取り履歴・更新履歴を丸ごとJSONスナップショットとして
 // backupsテーブルに保存する（Renderの無料プランはディスクが永続しないため、ローカルファイルではなく
 // 同じPostgres内に保存する方式にしている）。
 // 自動保存は「最後の自動バックアップから24時間以上経っていたら1件作る」という機会主義的な方式
@@ -10,7 +10,7 @@
 // 本当の意味でのデータ消失対策としては、/backup ページの「ダウンロード」でJSONファイルを
 // 定期的に手元（PC）に保存しておくことを推奨する。
 
-const BACKUP_TABLES = ['projects', 'required_documents', 'checklist_status', 'project_technicians', 'activity_log', 'document_samples'];
+const BACKUP_TABLES = ['projects', 'required_documents', 'checklist_status', 'project_technicians', 'agency_contacts', 'activity_log', 'document_samples'];
 
 async function snapshotData(pool) {
   const data = {};
@@ -106,6 +106,7 @@ async function restoreBackup(pool, backupId, userId) {
   try {
     await client.query('BEGIN');
     await client.query('DELETE FROM activity_log');
+    await client.query('DELETE FROM agency_contacts');
     await client.query('DELETE FROM project_technicians');
     await client.query('DELETE FROM required_documents');
     await client.query('DELETE FROM checklist_status');
@@ -116,12 +117,14 @@ async function restoreBackup(pool, backupId, userId) {
     await insertRows(client, 'required_documents', data.required_documents);
     await insertRows(client, 'checklist_status', data.checklist_status);
     await insertRows(client, 'project_technicians', data.project_technicians);
+    await insertRows(client, 'agency_contacts', data.agency_contacts);
     await insertRows(client, 'activity_log', data.activity_log);
     await insertRows(client, 'document_samples', data.document_samples);
 
     await resetSequenceIfNeeded(client, 'projects');
     await resetSequenceIfNeeded(client, 'required_documents');
     await resetSequenceIfNeeded(client, 'project_technicians');
+    await resetSequenceIfNeeded(client, 'agency_contacts');
     await resetSequenceIfNeeded(client, 'activity_log');
     await resetSequenceIfNeeded(client, 'document_samples');
 

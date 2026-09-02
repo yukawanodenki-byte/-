@@ -58,6 +58,29 @@ CREATE TABLE IF NOT EXISTS project_technicians (
   UNIQUE(project_id, role)
 );
 
+-- 発注機関とのやり取り履歴（電話・メール等）。案件ごとに時系列で記録する（2026年8月〜）。
+-- direction: 'outgoing'＝自社（受注者）からのアクション／'incoming'＝発注機関からの連絡・返信。
+-- これにより「こちらから連絡したか」「相手から返信があったか」が一覧で見分けられる。
+CREATE TABLE IF NOT EXISTS agency_contacts (
+  id            SERIAL PRIMARY KEY,
+  project_id    INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  contact_date  DATE NOT NULL,
+  method        TEXT NOT NULL DEFAULT 'phone',    -- 'phone'（電話） | 'email'（メール） | 'other'（その他）
+  direction     TEXT NOT NULL DEFAULT 'outgoing',  -- 'outgoing'（こちらから） | 'incoming'（相手から）
+  counterpart   TEXT,           -- 発注機関側の相手（氏名・部署等）
+  summary       TEXT NOT NULL,  -- やり取りの内容
+  created_by    INT REFERENCES users(id),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE agency_contacts ADD COLUMN IF NOT EXISTS direction TEXT NOT NULL DEFAULT 'outgoing';
+ALTER TABLE agency_contacts DROP CONSTRAINT IF EXISTS agency_contacts_method_check;
+ALTER TABLE agency_contacts ADD CONSTRAINT agency_contacts_method_check
+  CHECK (method IN ('phone','email','other'));
+ALTER TABLE agency_contacts DROP CONSTRAINT IF EXISTS agency_contacts_direction_check;
+ALTER TABLE agency_contacts ADD CONSTRAINT agency_contacts_direction_check
+  CHECK (direction IN ('outgoing','incoming'));
+CREATE INDEX IF NOT EXISTS idx_agency_contacts_project ON agency_contacts(project_id, contact_date DESC, created_at DESC);
+
 -- 必須書類（6種類固定）: 入札公告・入札説明書・仕様書/設計図面・見積参考資料・契約書・工事費内訳書
 CREATE TABLE IF NOT EXISTS required_documents (
   id           SERIAL PRIMARY KEY,

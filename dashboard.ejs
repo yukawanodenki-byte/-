@@ -80,7 +80,8 @@
       <% } %>
       <% if (s.project.folder_url) { %>
         <div class="folder-link-row">
-          <a href="<%= s.project.folder_url %>" target="_blank" rel="noopener" onclick="event.stopPropagation()">📁 共有フォルダを開く</a>
+          <button type="button" class="folder-open-link"
+            data-value="<%= s.project.folder_url %>" data-open-label="📁 共有フォルダを開く">📁 共有フォルダを開く</button>
         </div>
       <% } %>
     </a>

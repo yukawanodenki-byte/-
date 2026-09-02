@@ -8,6 +8,10 @@
 </div>
 <p><a href="/">← 案件一覧に戻る</a></p>
 
+<% if (message) { %>
+  <div class="card" style="border-color:var(--accent);"><%= message %></div>
+<% } %>
+
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <h2>基本情報</h2>
@@ -79,7 +83,8 @@
       <button class="btn secondary" type="submit" style="color:var(--red);border-color:var(--red);">🗑 完全に削除</button>
     </form>
     <% if (project.folder_url) { %>
-      <a class="btn secondary" href="<%= project.folder_url %>" target="_blank" rel="noopener">📁 共有フォルダを開く</a>
+      <button type="button" class="btn secondary folder-open-link"
+        data-value="<%= project.folder_url %>" data-open-label="📁 共有フォルダを開く">📁 共有フォルダを開く</button>
     <% } %>
   </div>
 </div>
@@ -166,6 +171,70 @@
       <% }) %>
     </details>
   <% }) %>
+</div>
+
+<div class="card" id="contacts">
+  <h2>発注機関とのやり取り履歴</h2>
+  <p class="helptext">電話・メール等でのやり取りを時系列で記録しておく欄です。「こちらから」「相手から」を選んでおくと、川野電気がアクションしたか・その後返信があったかが一覧で見返せます。</p>
+
+  <form method="post" action="/projects/<%= project.id %>/contacts" class="form-grid form-grid-2" style="margin-bottom:16px;">
+    <div>
+      <label>日付</label>
+      <input type="date" name="contact_date" required value="<%= new Date().toISOString().slice(0,10) %>">
+    </div>
+    <div>
+      <label>方法</label>
+      <select name="method">
+        <% CONTACT_METHOD_VALUES.forEach(v => { %>
+          <option value="<%= v %>"><%= CONTACT_METHOD_LABELS[v] %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label>方向</label>
+      <select name="direction">
+        <% CONTACT_DIRECTION_VALUES.forEach(v => { %>
+          <option value="<%= v %>"><%= CONTACT_DIRECTION_LABELS[v] %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label>相手（氏名・部署等）</label>
+      <input type="text" name="counterpart" placeholder="例: 契約担当 〇〇様">
+    </div>
+    <div style="grid-column:1/-1;">
+      <label>内容</label>
+      <textarea name="summary" rows="2" required placeholder="やり取りの内容を記入してください"></textarea>
+    </div>
+    <div style="grid-column:1/-1;">
+      <button class="btn" type="submit">＋ 記録を追加</button>
+    </div>
+  </form>
+
+  <% if (contacts.length === 0) { %>
+    <p>まだ記録がありません。</p>
+  <% } else { %>
+    <div class="contact-timeline">
+      <% contacts.forEach(c => { %>
+        <div class="contact-entry contact-<%= c.direction %>">
+          <div class="contact-entry-head">
+            <span class="contact-date"><%= new Date(c.contact_date).toLocaleDateString('ja-JP') %></span>
+            <span class="contact-method-badge"><%= CONTACT_METHOD_LABELS[c.method] || c.method %></span>
+            <span class="contact-direction-badge"><%= CONTACT_DIRECTION_LABELS[c.direction] || c.direction %></span>
+            <% if (c.counterpart) { %><span class="contact-counterpart"><%= c.counterpart %></span><% } %>
+          </div>
+          <p class="contact-summary"><%= c.summary %></p>
+          <div class="contact-entry-foot">
+            <span class="contact-meta">記録: <%= c.created_by_name || '（不明）' %> ・ <%= new Date(c.created_at).toLocaleString('ja-JP') %></span>
+            <form method="post" action="/projects/<%= project.id %>/contacts/<%= c.id %>/delete" style="display:inline"
+              onsubmit="return confirm('この記録を削除しますか？')">
+              <button class="btn secondary" type="submit" style="padding:2px 8px;font-size:12px;">削除</button>
+            </form>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
 </div>
 
 <%- include('footer') %>

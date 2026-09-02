@@ -225,6 +225,18 @@ function normalizeDocStatus(v) {
   return DOC_STATUS_VALUES.includes(v) ? v : 'not_started';
 }
 
+// 発注機関とのやり取り履歴（agency_contacts）用のラベル定義
+const CONTACT_METHOD_VALUES = ['phone', 'email', 'other'];
+const CONTACT_METHOD_LABELS = { phone: '電話', email: 'メール', other: 'その他' };
+const CONTACT_DIRECTION_VALUES = ['outgoing', 'incoming'];
+const CONTACT_DIRECTION_LABELS = { outgoing: 'こちらから', incoming: '相手から' };
+function normalizeContactMethod(v) {
+  return CONTACT_METHOD_VALUES.includes(v) ? v : 'phone';
+}
+function normalizeContactDirection(v) {
+  return CONTACT_DIRECTION_VALUES.includes(v) ? v : 'outgoing';
+}
+
 // ---- 提出期限アラート ----
 // 「2週間前は緑色、1週間前から赤色」という要望に沿い、期限までの残日数で判定する。
 // 残り14日以内になったら緑、残り7日未満（=1週間を切った、または期限超過）になったら赤。
@@ -780,6 +792,12 @@ app.get('/projects/:id', requireAuth, async (req, res) => {
     [projectId]
   );
   const { rows: techs } = await pool.query('SELECT * FROM project_technicians WHERE project_id = $1', [projectId]);
+  const { rows: contacts } = await pool.query(
+    `SELECT ac.*, u.display_name AS created_by_name FROM agency_contacts ac
+     LEFT JOIN users u ON u.id = ac.created_by
+     WHERE ac.project_id = $1 ORDER BY ac.contact_date DESC, ac.created_at DESC`,
+    [projectId]
+  );
   const users = await getUsersList();
 
   const statusMap = {};
@@ -812,9 +830,15 @@ app.get('/projects/:id', requireAuth, async (req, res) => {
     statusMap,
     docsMap,
     techMap,
+    contacts,
+    CONTACT_METHOD_LABELS,
+    CONTACT_DIRECTION_LABELS,
+    CONTACT_METHOD_VALUES,
+    CONTACT_DIRECTION_VALUES,
     users,
     assigneeName,
     precedents,
+    message: req.query.message || null,
     agencyGroupKey: groupKey,
     REQUIRED_DOC_KEYS,
     REQUIRED_DOC_LABELS,
@@ -905,6 +929,31 @@ app.post('/projects/:id/delete', requireAuth, async (req, res) => {
   await createBackup(pool, 'pre_delete', req.session.userId);
   await pool.query('DELETE FROM projects WHERE id = $1', [projectId]);
   res.redirect('/?message=' + encodeURIComponent(`案件「${project.name}」を削除しました`));
+});
+
+// ---- 発注機関とのやり取り履歴（電話・メール等） ----
+app.post('/projects/:id/contacts', requireAuth, async (req, res) => {
+  const projectId = Number(req.params.id);
+  const { contact_date, method, direction, counterpart, summary } = req.body;
+  if (!contact_date || !summary || !summary.trim()) {
+    return res.redirect(`/projects/${projectId}?message=` + encodeURIComponent('日付と内容は必須です') + '#contacts');
+  }
+  await pool.query(
+    `INSERT INTO agency_contacts (project_id, contact_date, method, direction, counterpart, summary, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [
+      projectId, contact_date, normalizeContactMethod(method), normalizeContactDirection(direction),
+      (counterpart || '').trim() || null, summary.trim(), req.session.userId,
+    ]
+  );
+  res.redirect(`/projects/${projectId}#contacts`);
+});
+
+app.post('/projects/:id/contacts/:contactId/delete', requireAuth, async (req, res) => {
+  const projectId = Number(req.params.id);
+  const contactId = Number(req.params.contactId);
+  await pool.query('DELETE FROM agency_contacts WHERE id = $1 AND project_id = $2', [contactId, projectId]);
+  res.redirect(`/projects/${projectId}#contacts`);
 });
 
 // ---- ajax: checklist item ----

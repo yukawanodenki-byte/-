@@ -26,6 +26,57 @@
     return res;
   }
 
+  // 「開く／パスをコピー」共通ロジック：http(s)://のURLはブラウザで直接開けるが、
+  // \\server\... のような共有サーバーのパスは、ブラウザのセキュリティ制限により
+  // web画面からのリンククリックでは開けない仕様になっている（file://やUNCパスへの
+  // 遷移はChrome等が意図的にブロックしている。Chromeの公式な仕様）。そのため、URL以外は
+  // 「開く」ではなく「パスをコピー」ボタンとして動作させ、エクスプローラーのアドレス欄等に
+  // 貼り付けてもらう方式にする。保存先リンク欄（field-row）・共有フォルダのリンク（案件詳細・
+  // 案件一覧カード）のどちらでも同じロジックを使う。
+  function isWebUrl(v) {
+    return /^https?:\/\//i.test(v);
+  }
+  function applySmartLinkMode(btn, val) {
+    if (!val) {
+      btn.style.visibility = 'hidden';
+      return;
+    }
+    btn.style.visibility = 'visible';
+    if (isWebUrl(val)) {
+      btn.textContent = btn.dataset.openLabel || '開く';
+      btn.dataset.mode = 'url';
+    } else {
+      btn.textContent = '📋 パスをコピー';
+      btn.dataset.mode = 'copy';
+    }
+  }
+  function handleSmartLinkClick(btn, val) {
+    if (!val) return;
+    if (btn.dataset.mode === 'url') {
+      window.open(val, '_blank', 'noopener');
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(val).then(() => {
+        const original = btn.textContent;
+        btn.textContent = 'コピーしました';
+        setTimeout(() => { btn.textContent = original; }, 1200);
+      }).catch(() => {
+        alert('コピーに失敗しました。お手数ですが欄の文字を選択してコピーしてください。\n\n保存先パス:\n' + val);
+      });
+    } else {
+      alert('このブラウザは自動コピーに対応していません。お手数ですが欄の文字を選択してコピーしてください。\n\n保存先パス:\n' + val);
+    }
+  }
+
+  // ---- 案件の「共有フォルダ」リンク（案件詳細ページ・案件一覧カード）----
+  document.querySelectorAll('.folder-open-link').forEach((btn) => {
+    const val = (btn.dataset.value || '').trim();
+    applySmartLinkMode(btn, val);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // 案件一覧カード（外側がリンク）の中にあるため、カード自体への遷移を止める
+      handleSmartLinkClick(btn, val);
+    });
+  });
+
   const STATUS_CLASSES = ['status-not_started', 'status-in_progress', 'status-submitted', 'status-revising', 'status-not_applicable', 'status-obtaining', 'status-saved'];
   function applyStatusClass(selectEl) {
     selectEl.classList.remove(...STATUS_CLASSES);
@@ -83,49 +134,15 @@
     }
     if (submittedAtInput) submittedAtInput.addEventListener('change', saveSubmission);
     if (submissionMethodInput) submissionMethodInput.addEventListener('change', saveSubmission);
-    // 保存先リンクの「開く」ボタン：http(s)://のURLはブラウザで直接開けるが、
-    // \\server\... のような共有サーバーのパスは、ブラウザのセキュリティ制限により
-    // web画面からのリンククリックでは開けない仕様になっている（file://やUNCパスへの
-    // 遷移はChrome等が意図的にブロックしている。Chromeの公式な仕様）。そのため、URL以外は
-    // 「開く」ではなく「パスをコピー」ボタンとして動作させ、エクスプローラーのアドレス欄等に
-    // 貼り付けてもらう方式にする。
-    function isWebUrl(v) {
-      return /^https?:\/\//i.test(v);
-    }
+    // 保存先リンクの「開く／パスをコピー」ボタン（ロジック本体は共通関数を利用）
     function updateOpenBtn() {
       if (!openBtn || !linkInput) return;
-      const val = linkInput.value.trim();
-      if (!val) {
-        openBtn.style.visibility = 'hidden';
-        return;
-      }
-      openBtn.style.visibility = 'visible';
-      if (isWebUrl(val)) {
-        openBtn.textContent = '開く';
-        openBtn.dataset.mode = 'url';
-      } else {
-        openBtn.textContent = '📋 パスをコピー';
-        openBtn.dataset.mode = 'copy';
-      }
+      applySmartLinkMode(openBtn, linkInput.value.trim());
     }
     updateOpenBtn();
     if (openBtn) {
       openBtn.addEventListener('click', () => {
-        const val = linkInput ? linkInput.value.trim() : '';
-        if (!val) return;
-        if (openBtn.dataset.mode === 'url') {
-          window.open(val, '_blank', 'noopener');
-        } else if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(val).then(() => {
-            const original = openBtn.textContent;
-            openBtn.textContent = 'コピーしました';
-            setTimeout(() => { openBtn.textContent = original; }, 1200);
-          }).catch(() => {
-            alert('コピーに失敗しました。お手数ですが欄の文字を選択してコピーしてください。\n\n保存先パス:\n' + val);
-          });
-        } else {
-          alert('このブラウザは自動コピーに対応していません。お手数ですが欄の文字を選択してコピーしてください。\n\n保存先パス:\n' + val);
-        }
+        handleSmartLinkClick(openBtn, linkInput ? linkInput.value.trim() : '');
       });
     }
     if (linkInput) {
