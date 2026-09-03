@@ -1,0 +1,124 @@
+<%- include('header', { title: '発注機関マスタ' }) %>
+<h1>発注機関マスタ</h1>
+<p class="helptext">入札に参加する発注機関を登録しておく画面です。案件の「発注機関」欄で名前を打つと、ここに登録された機関が<strong>似た言葉でも候補に出る</strong>ようになります（「大阪法務局」と打てば「大阪法務局（本局）」も候補に出ます）。表記ゆれで同じ機関が別々に登録されるのを防ぎ、「同系統発注機関での提出実績」の判定精度も上がります。</p>
+
+<% if (message) { %><div class="card" style="border-color:var(--accent);"><%= message %></div><% } %>
+<% if (error) { %><div class="card" style="border-color:var(--red);color:var(--red);"><%= error %></div><% } %>
+
+<div class="card">
+  <form method="get" action="/agencies" class="agency-search-form">
+    <input type="text" name="q" value="<%= q %>" placeholder="機関名で検索（似た言葉でも探せます）">
+    <button class="btn" type="submit">🔍 検索</button>
+    <% if (q) { %><a class="btn secondary" href="/agencies">クリア</a><% } %>
+  </form>
+  <p class="helptext">登録数: <%= totalCount %>機関<% if (q) { %> ／ 「<%= q %>」に近い順で<%= agencies.length %>件を表示中<% } %></p>
+</div>
+
+<div class="card">
+  <h2>登録済みの発注機関</h2>
+  <% if (agencies.length === 0) { %>
+    <p class="helptext"><%= q ? '該当する機関が見つかりませんでした。下のフォームから登録できます。' : 'まだ登録がありません。下のフォームから追加してください。' %></p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>発注機関</th><th>機関種別</th><th>系統</th><th>案件数</th><th>連絡先</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% agencies.forEach(a => { %>
+            <tr>
+              <td><strong><%= a.name %></strong><% if (a.address) { %><br><span class="helptext"><%= a.address %></span><% } %></td>
+              <td><%= AGENCY_KIND_LABELS[a.kind] || a.kind %></td>
+              <td>
+                <% if (a.group_key) { %><%= a.group_key %>
+                <% } else if (a.autoGroupKey) { %><%= a.autoGroupKey %><span class="helptext">（自動判定）</span>
+                <% } else { %>—<% } %>
+              </td>
+              <td><%= countByAgency[a.id] || 0 %>件</td>
+              <td>
+                <% if (a.contact_name || a.contact_phone) { %>
+                  <%= a.contact_name || '' %><% if (a.contact_phone) { %><br><span class="helptext"><%= a.contact_phone %></span><% } %>
+                <% } else { %>—<% } %>
+              </td>
+              <td style="white-space:nowrap;">
+                <button type="button" class="btn secondary row-edit-toggle" data-target="agc-<%= a.id %>">編集</button>
+                <form method="post" action="/agencies/<%= a.id %>/delete" style="display:inline"
+                  onsubmit="return confirm('「<%= a.name %>」を削除しますか？')">
+                  <button class="btn secondary" type="submit" style="color:var(--red);border-color:var(--red);">削除</button>
+                </form>
+              </td>
+            </tr>
+            <tr class="row-edit-form" id="agc-<%= a.id %>" style="display:none;">
+              <td colspan="6">
+                <form method="post" action="/agencies/<%= a.id %>">
+                  <div class="form-grid form-grid-3">
+                    <div><label>機関名 *</label><input type="text" name="name" value="<%= a.name %>" required></div>
+                    <div>
+                      <label>機関種別</label>
+                      <select name="kind">
+                        <% Object.keys(AGENCY_KIND_LABELS).forEach(k => { %>
+                          <option value="<%= k %>" <%= a.kind === k ? 'selected' : '' %>><%= AGENCY_KIND_LABELS[k] %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div>
+                      <label>系統</label>
+                      <select name="group_key">
+                        <option value="">（自動判定）</option>
+                        <% AGENCY_GROUPS.forEach(g => { %>
+                          <option value="<%= g.key %>" <%= a.group_key === g.key ? 'selected' : '' %>><%= g.key %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div><label>契約担当者</label><input type="text" name="contact_name" value="<%= a.contact_name || '' %>"></div>
+                    <div><label>電話番号</label><input type="text" name="contact_phone" value="<%= a.contact_phone || '' %>"></div>
+                    <div><label>所在地</label><input type="text" name="address" value="<%= a.address || '' %>"></div>
+                  </div>
+                  <label>郵送物の送り先</label>
+                  <textarea name="mailing_address" rows="2"><%= a.mailing_address || '' %></textarea>
+                  <label>備考</label>
+                  <textarea name="note" rows="2"><%= a.note || '' %></textarea>
+                  <div style="margin-top:10px;"><button class="btn" type="submit">保存</button></div>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2>発注機関を追加</h2>
+  <form method="post" action="/agencies">
+    <div class="form-grid form-grid-3">
+      <div><label>機関名 *</label><input type="text" name="name" required value="<%= q %>" placeholder="例: 法務省 松江刑務所"></div>
+      <div>
+        <label>機関種別</label>
+        <select name="kind">
+          <% Object.keys(AGENCY_KIND_LABELS).forEach(k => { %>
+            <option value="<%= k %>"><%= AGENCY_KIND_LABELS[k] %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label>系統</label>
+        <select name="group_key">
+          <option value="">（機関名から自動判定）</option>
+          <% AGENCY_GROUPS.forEach(g => { %><option value="<%= g.key %>"><%= g.key %></option><% }) %>
+        </select>
+      </div>
+      <div><label>契約担当者</label><input type="text" name="contact_name"></div>
+      <div><label>電話番号</label><input type="text" name="contact_phone"></div>
+      <div><label>所在地</label><input type="text" name="address"></div>
+    </div>
+    <label>郵送物の送り先</label>
+    <textarea name="mailing_address" rows="2" placeholder="書類を郵送する際の宛先。案件側にコピーして使えます"></textarea>
+    <label>備考</label>
+    <textarea name="note" rows="2"></textarea>
+    <p class="helptext">系統を空欄にすると、機関名に含まれる言葉（刑務所→法務省、地方整備局→国土交通省など）から自動で判定します。判定が合わない場合だけ手で選んでください。</p>
+    <div style="margin-top:14px;"><button class="btn" type="submit">＋ 登録</button></div>
+  </form>
+</div>
+<%- include('footer') %>

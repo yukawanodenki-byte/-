@@ -1,0 +1,111 @@
+<%- include('header', { title: '技術者マスタ' }) %>
+<h1>技術者マスタ</h1>
+<p class="helptext">主任技術者・監理技術者・現場代理人の候補になる人を登録しておく画面です。ここに登録しておくと、案件の「体制・工程」欄で名前を選ぶだけで配置でき、氏名の書き方の違い（「川野 晴輝」と「川野晴輝」など）で重複配置チェックが効かなくなる問題も起きません。低入札の「配置予定技術者名簿」や実務経験証明書を作るときの元データにもなります。</p>
+
+<% if (message) { %><div class="card" style="border-color:var(--accent);"><%= message %></div><% } %>
+<% if (error) { %><div class="card" style="border-color:var(--red);color:var(--red);"><%= error %></div><% } %>
+
+<div class="card">
+  <h2>登録済みの技術者（<%= engineers.filter(e => e.active).length %>名）</h2>
+  <% if (engineers.length === 0) { %>
+    <p class="helptext">まだ登録がありません。下のフォームから追加してください。</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>氏名</th><th>区分</th><th>保有資格</th><th>資格者証番号</th><th>経験年数</th><th>現在の配置</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% engineers.forEach(e => { const asg = assignmentsByEngineer[e.id] || []; %>
+            <tr<%= e.active ? '' : ' style="opacity:.5"' %>>
+              <td>
+                <strong><%= e.name %></strong>
+                <% if (e.name_kana) { %><br><span class="helptext"><%= e.name_kana %></span><% } %>
+                <% if (!e.active) { %><br><span class="badge">候補から除外中</span><% } %>
+              </td>
+              <td><%= ENGINEER_TYPE_LABELS[e.employment_type] || e.employment_type %></td>
+              <td><%= e.qualifications || '—' %></td>
+              <td><%= e.license_number || '—' %></td>
+              <td><%= e.experience_years || '—' %></td>
+              <td>
+                <% if (asg.length === 0) { %><span class="helptext">なし</span><% } else { %>
+                  <% asg.forEach(a => { %>
+                    <div style="font-size:12px;">
+                      <a href="/projects/<%= a.project_id %>"><%= a.project_name %></a>
+                      <span class="helptext">（<%= a.role %><%= a.exclusive ? '・専任' : '・非専任' %>）</span>
+                    </div>
+                  <% }) %>
+                <% } %>
+              </td>
+              <td style="white-space:nowrap;">
+                <button type="button" class="btn secondary row-edit-toggle" data-target="eng-<%= e.id %>">編集</button>
+                <form method="post" action="/engineers/<%= e.id %>/toggle-active" style="display:inline"
+                  onsubmit="return confirm('<%= e.name %> を<%= e.active ? '選択候補から外します' : '選択候補に戻します' %>。よろしいですか？')">
+                  <button class="btn secondary" type="submit"><%= e.active ? '除外' : '戻す' %></button>
+                </form>
+              </td>
+            </tr>
+            <tr class="row-edit-form" id="eng-<%= e.id %>" style="display:none;">
+              <td colspan="7">
+                <form method="post" action="/engineers/<%= e.id %>">
+                  <div class="form-grid form-grid-3">
+                    <div><label>氏名 *</label><input type="text" name="name" value="<%= e.name %>" required></div>
+                    <div><label>ふりがな</label><input type="text" name="name_kana" value="<%= e.name_kana || '' %>"></div>
+                    <div>
+                      <label>区分</label>
+                      <select name="employment_type">
+                        <% Object.keys(ENGINEER_TYPE_LABELS).forEach(k => { %>
+                          <option value="<%= k %>" <%= e.employment_type === k ? 'selected' : '' %>><%= ENGINEER_TYPE_LABELS[k] %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div><label>資格者証番号</label><input type="text" name="license_number" value="<%= e.license_number || '' %>"></div>
+                    <div><label>実務経験年数</label><input type="text" name="experience_years" value="<%= e.experience_years || '' %>"></div>
+                    <div><label>電話番号</label><input type="text" name="phone" value="<%= e.phone || '' %>"></div>
+                    <div><label>生年月日（任意）</label><input type="date" name="birth_date" value="<%= e.birth_date ? e.birth_date.toISOString().slice(0,10) : '' %>"></div>
+                  </div>
+                  <label>保有資格</label>
+                  <input type="text" name="qualifications" value="<%= e.qualifications || '' %>" placeholder="例: 1級電気工事施工管理技士、第一種電気工事士">
+                  <label>備考</label>
+                  <textarea name="note" rows="2"><%= e.note || '' %></textarea>
+                  <div style="margin-top:10px;"><button class="btn" type="submit">保存</button></div>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2>技術者を追加</h2>
+  <form method="post" action="/engineers">
+    <div class="form-grid form-grid-3">
+      <div><label>氏名 *</label><input type="text" name="name" required placeholder="例: 川野 晴輝"></div>
+      <div><label>ふりがな</label><input type="text" name="name_kana" placeholder="例: かわの はるき"></div>
+      <div>
+        <label>区分</label>
+        <select name="employment_type">
+          <% Object.keys(ENGINEER_TYPE_LABELS).forEach(k => { %>
+            <option value="<%= k %>"><%= ENGINEER_TYPE_LABELS[k] %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div><label>資格者証番号</label><input type="text" name="license_number" placeholder="監理技術者資格者証番号など"></div>
+      <div><label>実務経験年数</label><input type="text" name="experience_years" placeholder="例: 12年"></div>
+      <div><label>電話番号</label><input type="text" name="phone"></div>
+      <div><label>生年月日（任意）</label><input type="date" name="birth_date"></div>
+    </div>
+    <label>保有資格</label>
+    <input type="text" name="qualifications" placeholder="例: 1級電気工事施工管理技士、第一種電気工事士">
+    <p class="helptext">配置予定技術者名簿や資格者証の添付が必要になったときに参照できるよう、資格名は正式名称で入れておくことをおすすめします。生年月日は名簿に年齢欄がある場合のみ使うので、必要なければ空欄で構いません。</p>
+    <label>備考</label>
+    <textarea name="note" rows="2" placeholder="得意分野、配置上の注意点など"></textarea>
+    <div style="margin-top:14px;"><button class="btn" type="submit">＋ 登録</button></div>
+  </form>
+</div>
+<%- include('footer') %>

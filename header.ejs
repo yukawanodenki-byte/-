@@ -8,14 +8,38 @@
 </head>
 <body>
 <%
-  // サイドバーの現在地ハイライト用（CraftBank office等のツールを参考に、左サイドバー構成に変更）
-  const navItems = [
-    { href: '/', icon: '🏠', label: '案件一覧' },
-    { href: '/timeline', icon: '📅', label: '年間工程表' },
-    { href: '/templates', icon: '📄', label: '書類テンプレート' },
-    { href: '/backup', icon: '💾', label: 'バックアップ' },
-    { href: '/users', icon: '👥', label: 'メンバー管理' },
-    { href: '/manual', icon: '❓', label: '使い方マニュアル' },
+  // サイドバーの現在地ハイライト用。項目数が増えたため、CraftBank officeと同じように
+  // 「工事」「マスタ」「設定」のグループに分けて見やすくしている（2026年9月〜）。
+  const navGroups = [
+    {
+      label: null,   // 見出し無しの主要メニュー
+      items: [
+        { href: '/', icon: '🏠', label: '案件一覧' },
+        { href: '/timeline', icon: '📅', label: '年間工程表' },
+        { href: '/works', icon: '📊', label: '受注実績一覧' },
+      ],
+    },
+    {
+      label: '書類',
+      items: [
+        { href: '/templates', icon: '📄', label: '書類テンプレート' },
+      ],
+    },
+    {
+      label: 'マスタ',
+      items: [
+        { href: '/engineers', icon: '👷', label: '技術者マスタ' },
+        { href: '/agencies', icon: '🏛', label: '発注機関マスタ' },
+      ],
+    },
+    {
+      label: '設定・その他',
+      items: [
+        { href: '/users', icon: '👥', label: 'メンバー管理' },
+        { href: '/backup', icon: '💾', label: 'バックアップ' },
+        { href: '/manual', icon: '❓', label: '使い方マニュアル' },
+      ],
+    },
   ];
   const curPath = (typeof currentPath !== 'undefined' && currentPath) || '/';
   function isNavActive(href) {
@@ -31,10 +55,13 @@
       <span class="sidebar-brand-text">公共工事<br><small>提出書類チェックリスト</small></span>
     </div>
     <nav class="sidebar-nav">
-      <% navItems.forEach(function (item) { %>
-        <a href="<%= item.href %>" class="<%= isNavActive(item.href) ? 'active' : '' %>">
-          <span class="nav-icon"><%= item.icon %></span><%= item.label %>
-        </a>
+      <% navGroups.forEach(function (group) { %>
+        <% if (group.label) { %><div class="sidebar-group-label"><%= group.label %></div><% } %>
+        <% group.items.forEach(function (item) { %>
+          <a href="<%= item.href %>" class="<%= isNavActive(item.href) ? 'active' : '' %>">
+            <span class="nav-icon"><%= item.icon %></span><%= item.label %>
+          </a>
+        <% }) %>
       <% }) %>
     </nav>
   </aside>

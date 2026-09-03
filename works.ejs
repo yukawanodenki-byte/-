@@ -1,0 +1,74 @@
+<%- include('header', { title: '受注実績一覧' }) %>
+<h1>受注実績一覧</h1>
+<p class="helptext">登録済みの案件を、完成期日（未入力の場合は着工日・契約日）の年度別にまとめた一覧です。低入札価格調査の「過去に施工した公共工事名及びその発注者（書式211号）」を作るときや、経営事項審査で完成工事高を確認するときの元データとして使えます。金額は表示用のテキストなので、数字として読み取れたものだけを合計しています。</p>
+
+<div class="card">
+  <h2>年度別サマリー</h2>
+  <% const years = Object.keys(byYear).sort().reverse(); %>
+  <% if (years.length === 0) { %>
+    <p class="helptext">まだ案件が登録されていません。</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>年度</th><th>件数</th><th>金額合計（読み取れた分）</th></tr></thead>
+        <tbody>
+          <% years.forEach(y => { const v = byYear[y]; %>
+            <tr>
+              <td><strong><%= y %></strong></td>
+              <td><%= v.count %>件</td>
+              <td>
+                ¥<%= v.amount.toLocaleString('ja-JP') %>
+                <% if (v.amountKnown < v.count) { %>
+                  <span class="helptext">（<%= v.count - v.amountKnown %>件は金額を読み取れず未集計）</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <p class="helptext">年度は4月始まりで計算しています。「未設定」は完成期日・着工日・契約日のいずれも入力されていない案件です。</p>
+  <% } %>
+</div>
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <h2>工事一覧</h2>
+    <button type="button" class="btn secondary" id="copyWorksTable">📋 書式211号用にコピー</button>
+  </div>
+  <p class="helptext">「書式211号用にコピー」を押すと、<strong>工事名・発注者・請負金額・工期</strong>をタブ区切りでコピーします。Excelに貼り付けると表の形で入るので、様式に合わせて整えてください。</p>
+  <% if (works.length === 0) { %>
+    <p class="helptext">まだ案件が登録されていません。</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table id="worksTable">
+        <thead>
+          <tr><th>年度</th><th>工事名</th><th>発注機関</th><th>系統</th><th>請負金額</th><th>工期</th><th>状態</th></tr>
+        </thead>
+        <tbody>
+          <% works.forEach(w => { %>
+            <tr>
+              <td><%= w.fiscalYear === null ? '—' : w.fiscalYear + '年度' %></td>
+              <td>
+                <a href="/projects/<%= w.id %>"><%= w.name %></a>
+                <% if (w.is_low_bid) { %><span class="lowbid-badge">🔻 低入札</span><% } %>
+                <% if (w.archived) { %><span class="badge">アーカイブ</span><% } %>
+              </td>
+              <td><%= w.agency || '—' %></td>
+              <td><%= w.agencyGroupKey || '—' %></td>
+              <td><%= w.contract_amount || '—' %></td>
+              <td>
+                <% if (w.construction_start_date && w.construction_end_date) { %>
+                  <%= w.construction_start_date.toISOString().slice(0,10).replace(/-/g,'/') %>
+                  〜 <%= w.construction_end_date.toISOString().slice(0,10).replace(/-/g,'/') %>
+                <% } else { %><span class="helptext">未入力</span><% } %>
+              </td>
+              <td><%= w.completed ? '完成' : '進行中・予定' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+<%- include('footer') %>

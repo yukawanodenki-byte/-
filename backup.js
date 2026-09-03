@@ -1,4 +1,4 @@
-// バックアップ機能：案件・書類・チェックリスト・体制・やり取り履歴・更新履歴を丸ごとJSONスナップショットとして
+// バックアップ機能：案件・書類・チェックリスト・体制・やり取り履歴・各種マスタ・更新履歴を丸ごとJSONスナップショットとして
 // backupsテーブルに保存する（Renderの無料プランはディスクが永続しないため、ローカルファイルではなく
 // 同じPostgres内に保存する方式にしている）。
 // 自動保存は「最後の自動バックアップから24時間以上経っていたら1件作る」という機会主義的な方式
@@ -10,7 +10,9 @@
 // 本当の意味でのデータ消失対策としては、/backup ページの「ダウンロード」でJSONファイルを
 // 定期的に手元（PC）に保存しておくことを推奨する。
 
-const BACKUP_TABLES = ['projects', 'required_documents', 'checklist_status', 'project_technicians', 'agency_contacts', 'activity_log', 'document_samples'];
+// 注意：復元時は外部キーの順序があるため、参照される側（agencies / engineers）を先に入れる必要がある。
+// この配列の順序＝復元時の挿入順序なので、並べ替えるときはFKの向きに注意すること。
+const BACKUP_TABLES = ['agencies', 'engineers', 'projects', 'required_documents', 'checklist_status', 'project_technicians', 'agency_contacts', 'activity_log', 'document_samples'];
 
 async function snapshotData(pool) {
   const data = {};
@@ -105,14 +107,20 @@ async function restoreBackup(pool, backupId, userId) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // 削除は参照する側から先に（FK違反を避けるため、挿入とは逆順）
     await client.query('DELETE FROM activity_log');
     await client.query('DELETE FROM agency_contacts');
     await client.query('DELETE FROM project_technicians');
     await client.query('DELETE FROM required_documents');
     await client.query('DELETE FROM checklist_status');
     await client.query('DELETE FROM projects');
+    await client.query('DELETE FROM engineers');
+    await client.query('DELETE FROM agencies');
     await client.query('DELETE FROM document_samples');
 
+    // 挿入は参照される側から先に（projects.agency_id → agencies、project_technicians.engineer_id → engineers）
+    await insertRows(client, 'agencies', data.agencies);
+    await insertRows(client, 'engineers', data.engineers);
     await insertRows(client, 'projects', data.projects);
     await insertRows(client, 'required_documents', data.required_documents);
     await insertRows(client, 'checklist_status', data.checklist_status);
@@ -121,6 +129,8 @@ async function restoreBackup(pool, backupId, userId) {
     await insertRows(client, 'activity_log', data.activity_log);
     await insertRows(client, 'document_samples', data.document_samples);
 
+    await resetSequenceIfNeeded(client, 'agencies');
+    await resetSequenceIfNeeded(client, 'engineers');
     await resetSequenceIfNeeded(client, 'projects');
     await resetSequenceIfNeeded(client, 'required_documents');
     await resetSequenceIfNeeded(client, 'project_technicians');

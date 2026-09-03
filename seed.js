@@ -1,5 +1,6 @@
-// 初期データ投入スクリプト（区分①〜⑦・48項目の標準チェックリストカタログ ＋ 初期ユーザー）
-// ※もともと53項目だったが、2026年8月に「必須書類」欄と重複していた①区分の5項目を削除し48項目に。
+// 初期データ投入スクリプト（区分①〜⑧・62項目の標準チェックリストカタログ ＋ 初期ユーザー）
+// ※もともと53項目→2026年8月に「必須書類」欄と重複していた①区分の5項目を削除して48項目、
+//   →2026年9月に「⑧ 安全書類（グリーンファイル）」14項目を追加して62項目。
 // 実行: npm run seed
 // - checklist_categories/itemsが空の場合のみカテゴリ・項目を新規投入（既存プロジェクトのデータは触らない）
 // - text/note/descriptionは起動のたびに below の CATEGORIES 定義から同期される（syncCatalogText）
@@ -97,6 +98,29 @@ const CATEGORIES = [
       { text: '案件フォルダの整理・アーカイブ化', description: '案件に関する全書類・データを整理し、後から参照しやすい形でアーカイブすること。' },
     ],
   },
+  {
+    // 安全書類（通称グリーンファイル）。元請として現場を開設する場合に必要な書類群。
+    // 全建統一様式（一般社団法人 全国建設業協会）に沿った区分だが、様式集自体は有償頒布のため
+    // このシステムには様式ファイルを同梱していない（入手先は「書類テンプレート」ページに案内）。
+    // 自社施工が中心で下請がいない工事では、下請作成の書類は「対象外」にして根拠を書けばよい。
+    name: '⑧ 安全書類（グリーンファイル）',
+    items: [
+      { text: '安全衛生管理計画書の作成', description: '現場の安全衛生の方針・体制・活動計画をまとめた書類です。元請が作成し、現場の安全管理の土台になります。' },
+      { text: '作業員名簿の作成・更新', description: '現場に入る作業員の氏名・生年月日・保有資格・社会保険の加入状況等をまとめた名簿。入場する全員分が必要です。' },
+      { text: '有資格者一覧表の作成', description: '現場で必要な資格（電気工事士・各種技能講習等）を持つ作業員を一覧化した表。作業内容に応じた資格者の配置を示します。' },
+      { text: '新規入場者教育の実施・記録', description: '現場に初めて入る作業員へ行う安全教育。実施した内容と受講者を記録として残します。' },
+      { text: 'KY活動（危険予知）記録の作成', note: '作業日ごと', description: '作業前にその日の危険を洗い出し対策を決める活動の記録。日々の安全管理の中心になる書類です。' },
+      { text: '工事日報の作成', note: '作業日ごと', description: 'その日の作業内容・人員・天候・使用機械などを記録する日報。出来高の裏付けや後日の証拠にもなります。' },
+      { text: '安全パトロール・点検記録の作成', description: '定期的な現場巡視で確認した危険箇所と是正内容の記録。' },
+      { text: '持込機械等使用届の提出・受領', note: '該当する場合', description: '現場に持ち込む機械（高所作業車・電動工具等）について、点検状況とともに届け出る書類。' },
+      { text: '工事・通勤用車両届の提出・受領', note: '該当する場合', description: '現場に出入りする車両を届け出る書類。' },
+      { text: '火気使用願の提出・受領', note: '溶接・溶断等を行う場合', description: '溶接・溶断など火気を使う作業を行う際に、事前に承認を得るための書類。' },
+      { text: '有機溶剤・特定化学物質等持込使用届の提出・受領', note: '該当する場合', description: '塗料・接着剤など有害物質を持ち込む際の届出。SDS（安全データシート）の添付を求められることがあります。' },
+      { text: '緊急連絡先一覧・緊急時対応体制の整備', description: '事故発生時の連絡経路（元請・発注機関・救急・関係者）を明確にした一覧。現場に掲示します。' },
+      { text: '安全ミーティング（月例安全会議等）の記録', description: '定期的な安全会議で話し合った内容と参加者の記録。' },
+      { text: '下請からの安全書類の回収・確認', note: '下請契約がある場合', description: '下請業者が作成する作業員名簿・再下請負通知書・持込機械届等を元請として回収し、内容を確認すること。自社施工のみの工事では対象外にできます。' },
+    ],
+  },
 ];
 
 async function seedIfEmpty() {
@@ -123,7 +147,7 @@ async function seedIfEmpty() {
         }
         catOrder += 1;
       }
-      console.log('チェックリストカタログ（区分①〜⑦・48項目）を投入しました。');
+      console.log('チェックリストカタログ（区分①〜⑧・62項目）を投入しました。');
     } else {
       console.log('チェックリストカタログは投入済みのためスキップしました。');
     }
@@ -155,6 +179,11 @@ async function seedIfEmpty() {
 // カテゴリ・項目が既に存在していても、text/note/descriptionを常にCATEGORIES定義の内容へ同期する。
 // カテゴリのsort_order、項目のsort_order（カテゴリ内の並び順）で対応付ける。
 // これにより、次回以降このファイルの文言だけ直してデプロイすれば、DBの中身を直接触らずに反映できる。
+//
+// 2026年9月〜：既存の行を更新するだけでなく、定義にあってDBに無いカテゴリ・項目は新規に追加する
+// （追加のみ。定義から消した項目はここでは削除されないので、削除が必要なときは
+// index.js側に一度きりの移行処理を書くこと＝既存案件の入力内容を巻き込まないため）。
+// これが無いと、稼働中のDBには新しい区分（例:「⑧ 安全書類」）が永久に現れない。
 async function syncCatalogText() {
   const client = await pool.connect();
   try {
@@ -164,16 +193,31 @@ async function syncCatalogText() {
         'UPDATE checklist_categories SET name = $1 WHERE sort_order = $2 RETURNING id',
         [cat.name, catOrder]
       );
+      let categoryId;
       if (catRows.length > 0) {
-        const categoryId = catRows[0].id;
-        let itemOrder = 1;
-        for (const item of cat.items) {
+        categoryId = catRows[0].id;
+      } else {
+        const { rows: inserted } = await client.query(
+          'INSERT INTO checklist_categories (sort_order, name) VALUES ($1,$2) RETURNING id',
+          [catOrder, cat.name]
+        );
+        categoryId = inserted[0].id;
+        console.log(`チェックリスト区分「${cat.name}」を追加しました。`);
+      }
+
+      let itemOrder = 1;
+      for (const item of cat.items) {
+        const { rows: itemRows } = await client.query(
+          'UPDATE checklist_items SET text = $1, note = $2, description = $3 WHERE category_id = $4 AND sort_order = $5 RETURNING id',
+          [item.text, item.note || null, item.description || null, categoryId, itemOrder]
+        );
+        if (itemRows.length === 0) {
           await client.query(
-            'UPDATE checklist_items SET text = $1, note = $2, description = $3 WHERE category_id = $4 AND sort_order = $5',
-            [item.text, item.note || null, item.description || null, categoryId, itemOrder]
+            'INSERT INTO checklist_items (category_id, sort_order, text, note, description) VALUES ($1,$2,$3,$4,$5)',
+            [categoryId, itemOrder, item.text, item.note || null, item.description || null]
           );
-          itemOrder += 1;
         }
+        itemOrder += 1;
       }
       catOrder += 1;
     }
