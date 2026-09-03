@@ -1,287 +1,87 @@
-<%- include('header', { title: project.name }) %>
-<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
-  <div>
-    <h1><%= project.name %><% if (project.is_low_bid) { %><span class="lowbid-badge">🔻 低入札</span><% } %></h1>
-    <div class="assignee">👤 作成担当者: <%= assigneeName || '未設定' %><% if (agencyGroupKey) { %> ／ 発注機関系統: <%= agencyGroupKey %><% } %></div>
-  </div>
-  <span class="save-indicator" id="saveIndicator"></span>
-</div>
-<p><a href="/">← 案件一覧に戻る</a></p>
-
-<% if (message) { %>
-  <div class="card" style="border-color:var(--accent);"><%= message %></div>
-<% } %>
-
-<div class="project-layout">
-<div class="project-main-col">
+<%- include('header', { title: '使い方マニュアル' }) %>
+<h1>使い方マニュアル</h1>
+<p class="helptext">はじめてこのシステムを使う方向けの説明です。上から順に読めば一通りの操作がわかるようになっています。</p>
 
 <div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-    <h2>基本情報</h2>
-    <span class="basic-info-autosave-note">✎ 各項目は入力すると自動で保存されます（保存ボタンは不要です）</span>
-  </div>
-  <div id="basicInfoForm" data-project="<%= project.id %>">
-    <label>案件名</label>
-    <input type="text" name="name" class="basic-info-field" value="<%= project.name %>">
-    <label>発注機関</label>
-    <input type="text" name="agency" class="basic-info-field" value="<%= project.agency || '' %>">
-    <label>契約金額</label>
-    <input type="text" name="contract_amount" class="basic-info-field" value="<%= project.contract_amount || '' %>">
-    <label>工期</label>
-    <input type="text" name="period_text" class="basic-info-field" value="<%= project.period_text || '' %>">
-    <label>作成担当者</label>
-    <select name="assignee_user_id" class="basic-info-field">
-      <option value="">未設定</option>
-      <% users.forEach(function (u) { %>
-        <option value="<%= u.id %>" <%= project.assignee_user_id === u.id ? 'selected' : '' %>><%= u.display_name %></option>
-      <% }) %>
-    </select>
-    <label>共有フォルダのリンク（ドラッグ＆ドロップ可）</label>
-    <input type="text" name="folder_url" class="basic-info-field dropzone" value="<%= project.folder_url || '' %>" placeholder="例: \\server\projects\〇〇工事 または https://... 、ファイル/フォルダをドラッグしても入力できます">
-    <p class="helptext">全員が使っている共有サーバー上のこの案件のフォルダへのリンクです。保存すると案件一覧・このページ上部からすぐ開けます。書類ごとの保存先リンクは下の各行で個別に設定できます。
-      ※ ドラッグ＆ドロップはブラウザの仕様上、ファイル名・フォルダ名のみ自動入力されます。完全な保存先（\\server\...等）は自動入力後に手で補ってください。</p>
-
-    <h3 style="font-size:14px;margin:20px 0 4px;">年間工程表用（施工期間）</h3>
-    <div class="form-grid form-grid-2">
-      <div>
-        <label>着工日</label>
-        <input type="date" name="construction_start_date" class="basic-info-field" value="<%= project.construction_start_date ? project.construction_start_date.toISOString().slice(0,10) : '' %>">
-      </div>
-      <div>
-        <label>完成期日（完工日）</label>
-        <input type="date" name="construction_end_date" class="basic-info-field" value="<%= project.construction_end_date ? project.construction_end_date.toISOString().slice(0,10) : '' %>">
-      </div>
-    </div>
-    <p class="helptext">この2つの日付が案件一覧の「工期」と「<a href="/timeline">年間工程表</a>」の施工期間バーに反映されます。<strong>未入力のままだと年間工程表に「期間未設定」の警告が出ます。</strong>間違えないよう、必ず工事着手届・完成届等の原本の日付で入力してください。</p>
-
-    <h3 style="font-size:14px;margin:20px 0 4px;">発注機関の連絡先（基本情報）</h3>
-    <div class="form-grid form-grid-2">
-      <div>
-        <label>契約担当者 氏名</label>
-        <input type="text" name="contract_officer_name" class="basic-info-field" value="<%= project.contract_officer_name || '' %>" placeholder="発注機関側・契約担当の氏名">
-      </div>
-      <div>
-        <label>契約担当者 電話番号</label>
-        <input type="text" name="contract_officer_phone" class="basic-info-field" value="<%= project.contract_officer_phone || '' %>">
-      </div>
-      <div>
-        <label>監督職員 氏名</label>
-        <input type="text" name="supervisor_name" class="basic-info-field" value="<%= project.supervisor_name || '' %>" placeholder="現場を監督する発注機関側の担当者">
-      </div>
-      <div>
-        <label>監督職員 電話番号</label>
-        <input type="text" name="supervisor_phone" class="basic-info-field" value="<%= project.supervisor_phone || '' %>">
-      </div>
-    </div>
-    <label>郵送物の送り先</label>
-    <textarea name="mailing_address" class="basic-info-field" rows="2" placeholder="書類等を郵送する際の宛先住所・部署名"><%= project.mailing_address || '' %></textarea>
-  </div>
-
-  <div class="lowbid-toggle-wrap" data-autosave="project" data-project="<%= project.id %>" style="margin-top:16px;">
-    <button type="button" class="btn secondary lowbid-toggle-btn">🔻 低入札案件として登録</button>
-    <input type="hidden" class="lowbid-toggle-input" value="<%= project.is_low_bid ? 'true' : 'false' %>">
-    <p class="helptext lowbid-toggle-help" style="display:none;">低入札価格調査で一般的に求められる書類（16項目）を、必須書類とは別の専用リストとしてこの案件に追加しています。実際に必要な書類は発注機関の指示に必ず従って確認してください。</p>
-  </div>
-
-  <div style="margin-top:16px;">
-    <form method="post" action="/projects/<%= project.id %>/archive" style="display:inline"
-      onsubmit="return confirm('この案件をアーカイブしますか？一覧から非表示になります。')">
-      <button class="btn secondary" type="submit">アーカイブ</button>
-    </form>
-    <form method="post" action="/projects/<%= project.id %>/delete" style="display:inline"
-      onsubmit="return confirm('本当に「<%= project.name %>」を完全に削除しますか？\n\nこの操作は元に戻せません（アーカイブと違い、案件のデータそのものが消えます）。削除前の状態は自動でバックアップされますが、復元するには「バックアップ」ページからデータベース全体を丸ごと過去の状態に戻す必要があり、他の案件への更新も一緒に巻き戻ってしまいます。\n\n本当によろしければOKを押してください。')">
-      <button class="btn secondary" type="submit" style="color:var(--red);border-color:var(--red);">🗑 完全に削除</button>
-    </form>
-    <% if (project.folder_url) { %>
-      <button type="button" class="btn secondary folder-open-link"
-        data-value="<%= project.folder_url %>" data-open-label="📁 共有フォルダを開く">📁 共有フォルダを開く</button>
-    <% } %>
-  </div>
+  <h2>1. このシステムでできること</h2>
+  <p>公共工事を落札してから完工するまでに必要な提出書類・手続きを、案件ごとにチェックリストで管理するシステムです。ログインした人は誰でも同じ権限で内容を編集できます（自分だけ／閲覧のみ、という制限はありません）。全員が同じデータを見ているので、誰かが更新すれば他の人にもすぐ反映されます。</p>
 </div>
 
 <div class="card">
-  <h2>体制・工程</h2>
-  <div class="tech-grid">
-    <% ['監理技術者','主任技術者','現場代理人'].forEach(role => {
-      const t = techMap[role] || {};
-    %>
-      <div class="tech-col" data-role="<%= role %>" data-project="<%= project.id %>">
-        <h4><%= role %></h4>
-        <label>氏名</label>
-        <input type="text" class="tech-name" value="<%= t.person_name || '' %>" placeholder="未配置なら × など">
-        <div class="switch">
-          <label style="margin:0;display:flex;align-items:center;gap:4px;">
-            <input type="radio" name="exclusive-<%= role %>" class="tech-exclusive" value="true" <%= (t.exclusive === undefined || t.exclusive) ? 'checked' : '' %>> 専任
-          </label>
-          <label style="margin:0;display:flex;align-items:center;gap:4px;">
-            <input type="radio" name="exclusive-<%= role %>" class="tech-exclusive" value="false" <%= (t.exclusive === false) ? 'checked' : '' %>> 非専任
-          </label>
-        </div>
-        <div class="dates">
-          <div>
-            <label>開始日</label>
-            <input type="date" class="tech-start" value="<%= t.start_date ? t.start_date.toISOString().slice(0,10) : '' %>">
-          </div>
-          <div>
-            <label>終了日</label>
-            <input type="date" class="tech-end" value="<%= t.end_date ? t.end_date.toISOString().slice(0,10) : '' %>">
-          </div>
-        </div>
-      </div>
-    <% }) %>
-  </div>
-  <p class="helptext">同一氏名の技術者が期間の重なる複数案件に配置されている場合、案件一覧にバッジで表示されます（専任同士＝赤、非専任同士＝青）。</p>
+  <h2>2. ログイン／アカウント</h2>
+  <p>会社から発行されたユーザー名・パスワードでログインします。パスワードを忘れた場合は、他のメンバー（管理側）に「メンバー管理」画面から作り直してもらってください。新しく人を追加する場合も上部メニューの「メンバー管理」から登録できます。</p>
 </div>
 
 <div class="card">
-  <h2>必須書類</h2>
-  <% REQUIRED_DOC_KEYS.forEach(key => {
-    const row = docsMap[key] || { status: 'not_started' };
-    const precedentList = (precedents.docMap || {})[key] || [];
-  %>
-    <%- include('field_row', {
-      kind: 'doc', ref: key, projectId: project.id,
-      label: REQUIRED_DOC_LABELS[key], note: null,
-      description: REQUIRED_DOC_DESCRIPTIONS[key],
-      statusRow: row, precedents: precedentList,
-      STATUS_VALUES: STATUS_VALUES, STATUS_LABELS: STATUS_LABELS,
-      DOC_STATUS_VALUES: DOC_STATUS_VALUES, DOC_STATUS_LABELS: DOC_STATUS_LABELS,
-      extraLink: key === 'uchiwakesho' ? { href: '/templates', label: '📄 雛形をプレビュー' } : null,
-    }) %>
-  <% }) %>
-  <p class="helptext">ステータスは「未着手／取得中／保存済み」の3段階です（発注機関からの受領・保管状況の確認が目的のため、チェックリストとは異なる段階になっています）。「期限」は取得予定日、「保存日」は実際に保存できた日です（ステータスを「保存済み」に変えると、保存日が未入力なら自動で今日の日付が入ります。違う日の場合は手で直してください）。リンク欄には共有サーバー上の保存先（フォルダ/ファイルのパスやURL）を入力してください。ファイルそのものはこの画面には保存されません。</p>
+  <h2>3. 案件を登録する</h2>
+  <p>案件一覧の右上「＋ 案件を追加」から、案件名・発注機関・契約金額・工期・作成担当者を入力して登録します。何件かまとめて登録したいときは「貼り付けインポート」を使うと、「案件名: 〇〇」のような行形式のテキストを貼り付けるだけで一括作成できます（担当者は「担当者: 上西」のように行を追加すると、登録済みユーザーの表示名と一致すれば自動的に紐付きます）。</p>
+  <p><strong>低入札案件として登録</strong>：低入札価格調査の対象になった案件は、フォーム内の「🔻 低入札案件として登録」ボタンを押してから作成してください。押すと、通常の必須書類とは別に「低入札価格調査 関連書類」という専用のチェックリスト（16項目）が案件詳細ページに自動で追加されます。登録し忘れた場合や、後から低入札対象と判明した場合も、案件詳細ページの「基本情報」にある同じボタンでいつでも切り替えられます。</p>
 </div>
-
-<% if (project.is_low_bid) { %>
-<div class="card">
-  <h2>低入札価格調査 関連書類<span class="lowbid-badge">🔻 低入札</span></h2>
-  <p class="helptext">低入札価格調査で一般的に求められる書類の標準チェックリストです（国土交通省・日本下水道事業団等の公開様式を参考に作成）。<strong>実際に必要な書類・様式は発注機関・案件により異なるため、必ず当該案件の入札説明書・発注機関からの提出依頼と突き合わせて確認してください。</strong>ステータス・期限・保存先リンクの使い方は上の「必須書類」欄と同じです。</p>
-  <% LOW_BID_DOC_KEYS.forEach(key => {
-    const row = docsMap[key] || { status: 'not_started' };
-    const precedentList = (precedents.docMap || {})[key] || [];
-  %>
-    <%- include('field_row', {
-      kind: 'doc', ref: key, projectId: project.id,
-      label: LOW_BID_DOC_LABELS[key], note: null,
-      description: LOW_BID_DOC_DESCRIPTIONS[key],
-      statusRow: row, precedents: precedentList,
-      STATUS_VALUES: STATUS_VALUES, STATUS_LABELS: STATUS_LABELS,
-      DOC_STATUS_VALUES: DOC_STATUS_VALUES, DOC_STATUS_LABELS: DOC_STATUS_LABELS,
-      extraLink: null,
-    }) %>
-  <% }) %>
-</div>
-<% } %>
 
 <div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-    <h2>チェックリスト</h2>
-    <span>
-      <button type="button" class="btn secondary" id="expandAllCategories">すべて開く</button>
-      <button type="button" class="btn secondary" id="collapseAllCategories">すべて閉じる</button>
-    </span>
-  </div>
-  <p class="helptext">区分（①②③④…）は初期状態では閉じています。見出しをクリックすると開閉できます。未完了の項目がある区分ほど上の数字が小さく表示されます。</p>
-  <% itemsByCategory.forEach(group => {
-    const catDone = group.items.filter(it => ['submitted','not_applicable'].includes((statusMap[it.id]||{}).status)).length;
-  %>
-    <details class="checklist-category">
-      <summary><%= group.category.name %> <span class="cat-count">(<%= catDone %>/<%= group.items.length %>)</span></summary>
-      <% group.items.forEach(item => {
-        const row = statusMap[item.id] || { status: 'not_started' };
-        const precedentList = (precedents.itemMap || {})[item.id] || [];
-      %>
-        <%- include('field_row', {
-          kind: 'item', ref: item.id, projectId: project.id,
-          label: item.text, note: item.note,
-          description: item.description,
-          statusRow: row, precedents: precedentList,
-          STATUS_VALUES: STATUS_VALUES, STATUS_LABELS: STATUS_LABELS,
-          DOC_STATUS_VALUES: DOC_STATUS_VALUES, DOC_STATUS_LABELS: DOC_STATUS_LABELS,
-        }) %>
-      <% }) %>
-    </details>
-  <% }) %>
+  <h2>4. 案件詳細ページの見方</h2>
+  <p><strong>基本情報</strong>：案件名・発注機関・契約金額・工期に加えて、共有フォルダのリンク、作成担当者、年間工程表用の日付（契約日・着工日・完成期日）、発注機関側の契約担当者・監督職員の氏名／電話番号、郵送物の送り先を入力できます。特に契約日・着工日・完成期日の3つは「年間工程表」に直結する重要な項目なので、必ず正しい日付を入力してください。共有フォルダのリンク欄は、書類の保存先リンクと同様、http(s)://のURLなら「開く」ボタンでそのまま開き、\\server\...のような共有サーバーのパスなら「📋 パスをコピー」ボタンでコピーしてエクスプローラーに貼り付ける方式です（詳しくは5.の「保存先リンク」の説明を参照）。</p>
+  <p><strong>体制・工程</strong>：監理技術者・主任技術者・現場代理人の氏名、専任／非専任、配置期間を入力します。同じ人が期間の重なる別案件にも配置されていると、案件一覧や工程表で警告バッジが出ます。</p>
+  <p><strong>必須書類・チェックリスト</strong>：入札公告〜完工までの必要書類・手続きが一覧になっています。次の5. で詳しく説明します。低入札案件として登録した場合は、必須書類の下に「低入札価格調査 関連書類」の専用欄も表示されます。この16項目は国土交通省・日本下水道事業団等が公表している一般的な様式を参考にした標準リストなので、<strong>実際に必要な書類・様式は必ず発注機関からの提出依頼・入札説明書の内容と突き合わせて確認してください</strong>（発注機関により求められる書類が異なるため）。この欄は発注機関へ提出する書類を作成する目的のため、必須書類とは異なりチェックリストと同じ5段階のステータスで管理します（詳しくは5.を参照）。欄の見出し部分をクリックすると折りたたみ・展開ができます（初期状態は展開済み）。書式のテンプレートは「書類テンプレート」ページからプレビュー・ダウンロードできます（8.を参照）。</p>
+  <p><strong>アーカイブ／完全に削除</strong>：「アーカイブ」は案件一覧・工程表から非表示にするだけで、データは残ります（間違って登録した案件を一時的に隠したい場合などに）。「🗑 完全に削除」はデータそのものを消す操作で、元に戻せません（削除直前の状態は自動でバックアップされますが、復元には「バックアップ」ページからのデータベース全体の復元が必要です）。登録ミスなどで案件そのものが不要になった場合のみ使ってください。</p>
+  <p><strong>ページの配置</strong>：基本情報・体制・書類関係は画面左側にまとめ、右側に「発注機関とのやり取り履歴」を固定表示しています。やり取りの記録が増えても画面全体が下に伸びず、右側の一覧だけがその場でスクロールする作りです（詳しくは12.を参照）。画面の幅が狭い場合（スマホ・タブレット等）は縦1列表示に切り替わります。</p>
 </div>
 
+<div class="card">
+  <h2>5. 書類・チェックリスト項目の使い方（1行ずつの操作）</h2>
+  <p>各行（書類・チェックリスト項目）には次の要素があります。</p>
+  <p><strong>ステータス（プルダウン）</strong>：チェックリスト項目・低入札価格調査 関連書類は未着手／作成中／提出済み／修正中／対象外の5段階、必須書類は未着手／取得中／保存済みの3段階です（必須書類は発注機関からの受領・保管状況の確認が目的のため、あえて簡単な3段階にしています。チェックリストと低入札関連書類は、発注機関へ提出する書類を自社で作成する目的のため5段階です）。作業を始めたら「作成中」（必須書類は「取得中」）、完了したら「提出済み」（必須書類は「保存済み」）に必ず変更してください。この状態が案件一覧・工程表・締切アラートすべての元データになります。</p>
+  <p><strong>対象外</strong>：チェックリスト項目のみにある選択肢で、この工事では提出が不要な項目に使います。選ぶと根拠を書く欄が出るので、「下請契約が無いため不要」のように理由を必ず書いてください（あとで見た人が「なぜ対象外なのか」わかるようにするためです）。対象外にした項目は進捗率の計算から除外されます。</p>
+  <p><strong>期限（予定）／提出日（実績）・提出方法（必須書類は保存日・取得方法）</strong>：「期限」は完了させるべき予定日で、期限の2週間前になると緑、1週間前を切ると赤のバッジが行の右上に出ます（案件一覧の各カード、一覧ページ上部の「締切が近い項目」パネルにも反映されます）。実績日は実際に完了できた日で、ステータスを完了扱い（提出済み／保存済み）に変えると空欄なら自動で今日の日付が入ります（別の日の場合は手で直してください）。方法欄には郵送・持参・電子申請、あるいは発注機関からの受領方法など、自由に記入できます。</p>
+  <p><strong>保存先リンク</strong>：共有サーバー上のその書類の保存場所（フォルダやファイルへのパス／URL）を入れておく欄です。<strong>http(s)://から始まるURL</strong>（クラウドストレージの共有リンク等）を入れた場合は、ボタンが「開く」になり、押すとそのままブラウザで開きます。<strong>\\server\projects\〇〇工事\ のような共有サーバーのパス</strong>を入れた場合は、ボタンが「📋 パスをコピー」になります。これはブラウザの仕様上、Webページ上のリンクから共有サーバーのフォルダを直接開くことができない（セキュリティ上の制限で、Chrome等が意図的にブロックしている）ためです。ボタンを押すとパスがコピーされるので、エクスプローラーを開いてアドレス欄に貼り付ける（Ctrl+V→Enter）と、そのフォルダが開きます。ファイル／フォルダをこの欄にドラッグ＆ドロップすると名前だけ自動入力されますが、ブラウザの仕様上、完全な保存先までは自動取得できません。名前が入った後、必ず先頭に共有サーバーのパス（例: \\server\projects\〇〇工事\）を手で補ってください。</p>
+  <p><strong>協力業者への依頼</strong>：自社で作らず協力業者（外注）に作成を依頼する書類がある場合に使います。「🏗 協力業者への依頼」を開いて、依頼先の業者名・依頼日・依頼内容（いつ・何を依頼したか）を記入してください。誰が見ても依頼状況がわかるようにするための欄です。</p>
+  <p><strong>同系統発注機関での提出実績／保存実績</strong>：同じ系統の発注機関（法務省・国土交通省・防衛省など）の他の案件で、その書類・項目が過去に完了扱い（チェックリスト＝提出済み、必須書類＝保存済み）になっていると自動的に一覧表示されます。「この書類、前にも作ったことあるな」というときの参考にしてください。</p>
+  <p><strong>最終更新</strong>：その行を最後に触った人と日時が表示されます。</p>
+  <p><strong>チェックリストの区分（①②③④…）</strong>：初期状態では閉じています。見出しをクリックすると開閉でき、カード右上の「すべて開く／すべて閉じる」でまとめて操作できます。見出しには「区分内で何件が提出済み・対象外になっているか（n/合計）」が表示されるので、開かなくても進み具合が確認できます。</p>
+  <p><strong>各行の左端の色</strong>：作成中は黄、提出済みは緑、修正中は赤、対象外は紫の細い線が行の左端に付きます。開いたときに一目で状況がわかるようにするための目印です。</p>
 </div>
-<!-- /project-main-col -->
 
-<div class="project-side-col">
-<div class="card" id="contacts">
-  <h2>発注機関とのやり取り履歴</h2>
-  <p class="helptext">電話・メール等でのやり取りを時系列で記録しておく欄です。「こちらから」「相手から」を選んでおくと、川野電気がアクションしたか・その後返信があったかが一覧で見返せます。リンク欄にはメールへのリンク（Gmailのメッセージリンク等）やmailto:リンクも貼り付けられます。</p>
-
-  <form method="post" action="/projects/<%= project.id %>/contacts" style="margin-bottom:16px;display:flex;flex-direction:column;gap:10px;">
-    <div>
-      <label>日付</label>
-      <input type="date" name="contact_date" required value="<%= new Date().toISOString().slice(0,10) %>">
-    </div>
-    <div>
-      <label>方法</label>
-      <select name="method">
-        <% CONTACT_METHOD_VALUES.forEach(v => { %>
-          <option value="<%= v %>"><%= CONTACT_METHOD_LABELS[v] %></option>
-        <% }) %>
-      </select>
-    </div>
-    <div>
-      <label>方向</label>
-      <select name="direction">
-        <% CONTACT_DIRECTION_VALUES.forEach(v => { %>
-          <option value="<%= v %>"><%= CONTACT_DIRECTION_LABELS[v] %></option>
-        <% }) %>
-      </select>
-    </div>
-    <div>
-      <label>相手（氏名・部署等）</label>
-      <input type="text" name="counterpart" placeholder="例: 契約担当 〇〇様">
-    </div>
-    <div>
-      <label>内容</label>
-      <textarea name="summary" rows="2" required placeholder="やり取りの内容を記入してください"></textarea>
-    </div>
-    <div>
-      <label>リンク（メールへのリンク等・任意）</label>
-      <input type="text" name="link_url" placeholder="例: メールの共有リンク、mailto:... など">
-    </div>
-    <div>
-      <button class="btn" type="submit">＋ 記録を追加</button>
-    </div>
-  </form>
-
-  <% if (contacts.length === 0) { %>
-    <p>まだ記録がありません。</p>
-  <% } else { %>
-    <div class="contact-timeline">
-      <% contacts.forEach(c => { %>
-        <div class="contact-entry contact-<%= c.direction %>">
-          <div class="contact-entry-head">
-            <span class="contact-date"><%= new Date(c.contact_date).toLocaleDateString('ja-JP') %></span>
-            <span class="contact-method-badge"><%= CONTACT_METHOD_LABELS[c.method] || c.method %></span>
-            <span class="contact-direction-badge"><%= CONTACT_DIRECTION_LABELS[c.direction] || c.direction %></span>
-            <% if (c.counterpart) { %><span class="contact-counterpart"><%= c.counterpart %></span><% } %>
-          </div>
-          <p class="contact-summary"><%= c.summary %></p>
-          <% if (c.link_url) { %>
-            <button type="button" class="contact-open-link" data-value="<%= c.link_url %>" data-open-label="🔗 リンクを開く">🔗 リンクを開く</button>
-          <% } %>
-          <div class="contact-entry-foot">
-            <span class="contact-meta">記録: <%= c.created_by_name || '（不明）' %> ・ <%= new Date(c.created_at).toLocaleString('ja-JP') %></span>
-            <form method="post" action="/projects/<%= project.id %>/contacts/<%= c.id %>/delete" style="display:inline"
-              onsubmit="return confirm('この記録を削除しますか？')">
-              <button class="btn secondary" type="submit" style="padding:2px 8px;font-size:12px;">削除</button>
-            </form>
-          </div>
-        </div>
-      <% }) %>
-    </div>
-  <% } %>
+<div class="card">
+  <h2>6. 案件一覧（ダッシュボード）の見方</h2>
+  <p>各案件のカードに、進捗バー、チェックリスト・必須書類の完了状況、締切バッジ（赤＝締切間近、緑＝締切接近）、作成担当者、共有フォルダへのリンクが表示されます。ページ上部の「締切が近い項目」パネルには、全案件を横断して締切が近い項目が一覧で出るので、朝いちばんに確認する場所として使ってください。</p>
 </div>
-</div>
-<!-- /project-side-col -->
 
+<div class="card">
+  <h2>7. 年間工程表の見方</h2>
+  <p>上部メニューの「年間工程表」では、登録済みの案件を契約日・着工日・完成期日をもとに横並びのグラフで表示します。グレーの部分が「準備期間」（契約〜着工）、青い部分が「施工期間」（着工〜完工）です。赤い縦線が「今日」の位置です。日付が未入力の案件は、バーの代わりに「⚠ 日付が未入力です」という警告が出るので、見つけたら早めに該当案件の基本情報から入力してください。ページ下部には、これとは別に「技術者の配置期間（重複チェック）」という一覧もあります。こちらは技術者の配置スケジュールを見るためのもので、年間工程表とは別物です。</p>
 </div>
-<!-- /project-layout -->
 
+<div class="card">
+  <h2>8. 書類テンプレート</h2>
+  <p>上部メニューの「書類テンプレート」から、社内で使っている雛形ファイル（工事費内訳書）をプレビュー・ダウンロードできます。「プレビュー」ボタンを押すとMicrosoft Office Onlineの画面でその場で内容を確認でき、Excelを開かなくても中身が見られます。実際に使うときは必ずダウンロードしてコピーしてから編集してください（このテンプレート自体を直接編集しないこと）。</p>
+  <p><strong>低入札価格調査 関連書類のテンプレート</strong>：同じページに、実際に低入札価格調査で提出した様式一式（書式第200号・202号〜211号ほか）もあります。免許番号・取引銀行等の自社の基本情報はあらかじめ入力済みなので、案件名・日付・数量・金額など案件固有の部分だけ書き換えて使えます。PDFなのでプレビューは押すとブラウザでそのまま開きます。こちらは自社の連絡先等が含まれるため、ログインしている人のみ閲覧できます。</p>
+</div>
+
+<div class="card">
+  <h2>9. 画面の色（白基調／青基調／黒基調）</h2>
+  <p>右上（ログイン名の左）の3つのアイコン（☀ 💧 🌙）で画面の配色を切り替えられます。白基調が眩しいと感じる場合は、青基調（淡い青、目に優しい）や黒基調（暗い画面）を選んでください。選んだ色はログインアカウントに保存されるので、次回ログイン時も、別のパソコンからログインしても同じ配色になります（人によって違う色を選んでも大丈夫です）。</p>
+</div>
+
+<div class="card">
+  <h2>10. バックアップ</h2>
+  <p>上部メニューの「バックアップ」から、案件・書類・チェックリスト・体制・更新履歴のデータをまとめて保存したものを確認・復元できます。誰かがこのシステムにアクセスするたびに、最後の自動バックアップから24時間以上経っていれば新しく1件作られます（直近14件を保持）。手動で今すぐ作りたいときは「今すぐ手動でバックアップを作成」ボタンを押してください。</p>
+  <p>間違えてデータを消してしまった・おかしくなってしまった場合は、一覧から適切な時点のバックアップを選んで「⏪ このバックアップから復元」を押してください（復元前の状態も自動で退避されるので、間違えて復元してもさらに戻せます）。</p>
+  <p><strong>大事な注意</strong>：バックアップは同じデータベースの中に保存されているため、データベースそのものが削除・破損した場合は一緒に失われます。特に現在のデータベースは無料プランのため一定期間で自動削除される予定があるので、「⬇ ダウンロード」で定期的にJSONファイルとして手元のパソコンに保存しておくことを強くおすすめします。</p>
+</div>
+
+<div class="card">
+  <h2>11. 発注機関とのやり取り履歴</h2>
+  <p>案件詳細ページの右側に「発注機関とのやり取り履歴」欄があります。電話・メールでのやり取りを、日付・方法（電話／メール／その他）・方向（こちらから／相手から）・相手（氏名や部署）・内容とともに記録でき、新しいものが上に来るよう自動的に時系列で並びます。この欄は画面をスクロールしても右側に固定表示され、記録の一覧部分だけが内部でスクロールするようになっているので、記録が増えても書類確認のために毎回下までスクロールする必要はありません。</p>
+  <p>「方向」を正しく選んでおくと、こちらから連絡した後に相手から返信・折り返しがあったかどうかが一覧を見返すだけで把握できます（例：「こちらから」で見積依頼の電話をした記録の後、「相手から」で回答があった記録を追加しておく、という使い方）。</p>
+  <p><strong>リンク欄</strong>：任意項目です。メールのやり取りへのリンク（Gmail等のメッセージへの共有リンクや、<code>mailto:</code>から始まるリンク）を貼り付けておくと、記録の下に「🔗 リンクを開く」ボタンが表示され、押すとそのまま開けます（共有サーバーのフォルダパスを入れた場合は、他の保存先リンク欄と同様「📋 パスをコピー」ボタンになります）。</p>
+  <p>記録は追加のみで自動保存されず、フォームの「＋ 記録を追加」ボタンを押した時点で保存されます。誤って登録した記録は各項目の「削除」ボタンから消せます。</p>
+</div>
+
+<div class="card">
+  <h2>12. よくある操作の注意点</h2>
+  <p>・日付の入力ミスは工程表や締切アラートに直接影響するので、契約書・工事着手届など原本を見ながら入力してください。<br>
+  ・ステータスを更新し忘れると、進捗や締切アラートが実際と合わなくなります。作業の区切りごとに必ずステータスを更新する習慣をつけてください。<br>
+  ・「対象外」にする場合は必ず根拠を書いてください。理由が無いと、後から見た人が判断に困ります。<br>
+  ・保存はすべて自動（項目を変更した瞬間に保存されます）。ページ上部に「保存しました」と出れば反映されています。表示が変わらない場合は通信状況を確認してください。</p>
+</div>
 <%- include('footer') %>

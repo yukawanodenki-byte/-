@@ -1,80 +1,323 @@
-<%
-  // 汎用の1行コンポーネント。必須書類（kind='doc'）とチェックリスト項目（kind='item'）の
-  // どちらからも同じ見た目・同じJSで動かすための共通パーツ。ただしステータスの選択肢は、
-  // 必須書類＝3段階（未着手／取得中／保存済み）、チェックリスト項目＝5段階と異なるため、
-  // kindに応じて使う選択肢・文言を切り替える。
-  const row = statusRow || { status: 'not_started' };
-  const due = row.due_date ? row.due_date.toISOString().slice(0, 10) : '';
-  const submittedAt = row.submitted_at ? row.submitted_at.toISOString().slice(0, 10) : '';
-  const alertLevel = row.alertLevel || 'none';
-  const isDoc = kind === 'doc';
-  const rowStatusValues = isDoc ? DOC_STATUS_VALUES : STATUS_VALUES;
-  const rowStatusLabels = isDoc ? DOC_STATUS_LABELS : STATUS_LABELS;
-%>
-<div class="field-row" data-kind="<%= kind %>" data-project="<%= projectId %>" data-ref="<%= ref %>">
-  <div class="field-row-head">
-    <select class="status-select field-status">
-      <% rowStatusValues.forEach(function (sv) { %>
-        <option value="<%= sv %>" <%= row.status === sv ? 'selected' : '' %>><%= rowStatusLabels[sv] %></option>
-      <% }) %>
-    </select>
-    <span class="field-row-name"><%= label %></span>
-    <% if (note) { %><span class="note">（<%= note %>）</span><% } %>
-    <% if (alertLevel !== 'none') { %>
-      <span class="due-badge due-<%= alertLevel %>">
-        <%= row.daysRemaining < 0 ? '期限超過' : (alertLevel === 'red' ? (isDoc ? '取得期限間近' : '提出間近') : 'まもなく期限') %>
-      </span>
-    <% } %>
-    <% if (typeof extraLink !== 'undefined' && extraLink) { %>
-      <a class="btn secondary" href="<%= extraLink.href %>" target="_blank" rel="noopener"><%= extraLink.label %></a>
-    <% } %>
-  </div>
-  <% if (description) { %><div class="field-desc"><%= description %></div><% } %>
-  <div class="field-row-controls">
-    <label class="mini-label">期限（予定）
-      <input type="date" class="field-due" value="<%= due %>">
-    </label>
-    <label class="mini-label"><%= isDoc ? '保存日（実績）' : '提出日（実績）' %>
-      <input type="date" class="field-submitted-at" value="<%= submittedAt %>">
-    </label>
-    <label class="mini-label"><%= isDoc ? '取得方法' : '提出方法' %>
-      <input type="text" class="field-submission-method" value="<%= row.submission_method || '' %>" placeholder="<%= isDoc ? '例: 発注機関から郵送・契約時に受領 等' : '例: 郵送・持参・電子申請 等' %>">
-    </label>
-    <label class="mini-label">保存先リンク（ドラッグ＆ドロップ可）
-      <input type="text" class="field-link dropzone" value="<%= row.link_url || '' %>" placeholder="共有サーバー上の保存先 or ファイル/フォルダをドラッグ">
-    </label>
-    <button type="button" class="btn secondary field-open-link"
-      style="<%= row.link_url ? '' : 'visibility:hidden' %>">開く</button>
-  </div>
-  <div class="field-note-wrap" style="<%= row.status === 'not_applicable' ? '' : 'display:none' %>">
-    <label class="mini-label">対象外とする根拠</label>
-    <textarea class="field-note" rows="2" placeholder="例: 下請契約が無いため不要"><%= row.status_note || '' %></textarea>
-  </div>
-  <details class="contractor-box" <%= row.contractor_name ? 'open' : '' %>>
-    <summary>🏗 協力業者への依頼<% if (row.contractor_name) { %>（<%= row.contractor_name %>）<% } %></summary>
-    <div class="contractor-fields">
-      <label class="mini-label">協力業者名
-        <input type="text" class="contractor-name" value="<%= row.contractor_name || '' %>" placeholder="例: 〇〇電設">
-      </label>
-      <label class="mini-label">依頼日
-        <input type="date" class="contractor-date" value="<%= row.requested_at ? row.requested_at.toISOString().slice(0,10) : '' %>">
-      </label>
-      <label class="mini-label">依頼内容（いつ・何を依頼したか）
-        <textarea class="contractor-detail" rows="2" placeholder="例: 8/28に電話で施工体制台帳の作成を依頼、9/5納品予定"><%= row.request_detail || '' %></textarea>
-      </label>
-    </div>
-  </details>
-  <% if (row.updated_at) { %>
-    <div class="field-meta">最終更新: <%= new Date(row.updated_at).toLocaleString('ja-JP') %> — <%= row.updated_by_name || '不明' %></div>
-  <% } %>
-  <% if (precedents && precedents.length > 0) { %>
-    <details class="precedent-box">
-      <summary>📋 同系統発注機関での<%= isDoc ? '保存' : '提出' %>実績（<%= precedents.length %>件）</summary>
-      <ul>
-        <% precedents.forEach(function (pr) { %>
-          <li><a href="/projects/<%= pr.projectId %>" target="_blank"><%= pr.projectName %></a> — <%= pr.updatedByName %>（<%= new Date(pr.updatedAt).toLocaleDateString('ja-JP') %>）</li>
-        <% }) %>
-      </ul>
-    </details>
-  <% } %>
-</div>
+(function () {
+  const indicator = document.getElementById('saveIndicator');
+  function flashSaved() {
+    if (!indicator) return;
+    indicator.textContent = '保存しました';
+    indicator.classList.add('saved');
+    setTimeout(() => {
+      indicator.textContent = '';
+      indicator.classList.remove('saved');
+    }, 1500);
+  }
+  function flashSaving() {
+    if (!indicator) return;
+    indicator.textContent = '保存中…';
+    indicator.classList.remove('saved');
+  }
+
+  async function postJSON(url, body) {
+    flashSaving();
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) flashSaved();
+    return res;
+  }
+
+  // 「開く／パスをコピー」共通ロジック：http(s)://のURLはブラウザで直接開けるが、
+  // \\server\... のような共有サーバーのパスは、ブラウザのセキュリティ制限により
+  // web画面からのリンククリックでは開けない仕様になっている（file://やUNCパスへの
+  // 遷移はChrome等が意図的にブロックしている。Chromeの公式な仕様）。そのため、URL以外は
+  // 「開く」ではなく「パスをコピー」ボタンとして動作させ、エクスプローラーのアドレス欄等に
+  // 貼り付けてもらう方式にする。保存先リンク欄（field-row）・共有フォルダのリンク（案件詳細・
+  // 案件一覧カード）のどちらでも同じロジックを使う。
+  function isWebUrl(v) {
+    return /^(https?:|mailto:)/i.test(v);
+  }
+  function applySmartLinkMode(btn, val) {
+    if (!val) {
+      btn.style.visibility = 'hidden';
+      return;
+    }
+    btn.style.visibility = 'visible';
+    if (isWebUrl(val)) {
+      btn.textContent = btn.dataset.openLabel || '開く';
+      btn.dataset.mode = 'url';
+    } else {
+      btn.textContent = '📋 パスをコピー';
+      btn.dataset.mode = 'copy';
+    }
+  }
+  function handleSmartLinkClick(btn, val) {
+    if (!val) return;
+    if (btn.dataset.mode === 'url') {
+      window.open(val, '_blank', 'noopener');
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(val).then(() => {
+        const original = btn.textContent;
+        btn.textContent = 'コピーしました';
+        setTimeout(() => { btn.textContent = original; }, 1200);
+      }).catch(() => {
+        alert('コピーに失敗しました。お手数ですが欄の文字を選択してコピーしてください。\n\n保存先パス:\n' + val);
+      });
+    } else {
+      alert('このブラウザは自動コピーに対応していません。お手数ですが欄の文字を選択してコピーしてください。\n\n保存先パス:\n' + val);
+    }
+  }
+
+  // ---- 案件の「共有フォルダ」リンク（案件詳細ページ・案件一覧カード）----
+  document.querySelectorAll('.folder-open-link').forEach((btn) => {
+    const val = (btn.dataset.value || '').trim();
+    applySmartLinkMode(btn, val);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // 案件一覧カード（外側がリンク）の中にあるため、カード自体への遷移を止める
+      handleSmartLinkClick(btn, val);
+    });
+  });
+
+  // ---- やり取り履歴の各記録に付けたリンク（メールへのリンク等）----
+  document.querySelectorAll('.contact-open-link').forEach((btn) => {
+    const val = (btn.dataset.value || '').trim();
+    applySmartLinkMode(btn, val);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleSmartLinkClick(btn, val);
+    });
+  });
+
+  // ---- 低入札トグルボタン（案件追加フォーム／案件詳細の基本情報）----
+  // 案件詳細ページ（data-autosave="project"）ではクリック時にすぐサーバーへ反映する。
+  // 案件追加フォームではhidden inputの値がそのままフォーム送信される。
+  document.querySelectorAll('.lowbid-toggle-wrap').forEach((wrap) => {
+    const btn = wrap.querySelector('.lowbid-toggle-btn');
+    const input = wrap.querySelector('.lowbid-toggle-input');
+    const help = wrap.querySelector('.lowbid-toggle-help');
+    if (!btn || !input) return;
+    function render() {
+      const active = input.value === 'true';
+      btn.classList.toggle('active', active);
+      btn.textContent = active ? '✅ 低入札案件（解除する場合はクリック）' : '🔻 低入札案件として登録';
+      if (help) help.style.display = active ? '' : 'none';
+    }
+    render();
+    btn.addEventListener('click', () => {
+      input.value = input.value === 'true' ? 'false' : 'true';
+      render();
+      if (wrap.dataset.autosave === 'project' && wrap.dataset.project) {
+        postJSON(`/api/projects/${wrap.dataset.project}/low-bid`, { is_low_bid: input.value });
+      }
+    });
+  });
+
+  const STATUS_CLASSES = ['status-not_started', 'status-in_progress', 'status-submitted', 'status-revising', 'status-not_applicable', 'status-obtaining', 'status-saved'];
+  function applyStatusClass(selectEl) {
+    selectEl.classList.remove(...STATUS_CLASSES);
+    selectEl.classList.add('status-' + selectEl.value);
+  }
+
+  document.querySelectorAll('.status-select').forEach((el) => applyStatusClass(el));
+
+  // ---- 必須書類／チェックリスト項目 共通（field-row）----
+  function endpointBase(row) {
+    const kind = row.dataset.kind;
+    const projectId = row.dataset.project;
+    const ref = row.dataset.ref;
+    return kind === 'doc'
+      ? `/api/projects/${projectId}/documents/${encodeURIComponent(ref)}`
+      : `/api/projects/${projectId}/items/${ref}`;
+  }
+
+  document.querySelectorAll('.field-row').forEach((row) => {
+    const base = endpointBase(row);
+    const statusSel = row.querySelector('.field-status');
+    const dueInput = row.querySelector('.field-due');
+    const linkInput = row.querySelector('.field-link');
+    const openBtn = row.querySelector('.field-open-link');
+    const noteWrap = row.querySelector('.field-note-wrap');
+    const noteInput = row.querySelector('.field-note');
+    const submittedAtInput = row.querySelector('.field-submitted-at');
+    const submissionMethodInput = row.querySelector('.field-submission-method');
+
+    function saveSubmission() {
+      postJSON(`${base}/submission`, {
+        submitted_at: submittedAtInput ? submittedAtInput.value : '',
+        submission_method: submissionMethodInput ? submissionMethodInput.value : '',
+      });
+    }
+
+    // 「保存の確認」目的の行（必須書類）は「保存済み」、「作成・提出」目的の行
+    // （チェックリスト項目・低入札関連書類）は「提出済み」が完了扱いの値
+    const terminalStatus = row.dataset.statusScheme === 'store' ? 'saved' : 'submitted';
+    if (statusSel) {
+      statusSel.addEventListener('change', () => {
+        applyStatusClass(statusSel);
+        if (noteWrap) noteWrap.style.display = statusSel.value === 'not_applicable' ? '' : 'none';
+        postJSON(`${base}/status`, { status: statusSel.value });
+        // 完了扱いの値に変えたのに実績日が空なら、今日の日付を自動で入れておく（入れ忘れ防止。手で修正も可能）
+        if (statusSel.value === terminalStatus && submittedAtInput && !submittedAtInput.value) {
+          submittedAtInput.value = new Date().toISOString().slice(0, 10);
+          saveSubmission();
+        }
+      });
+    }
+    if (dueInput) {
+      dueInput.addEventListener('change', () => {
+        postJSON(`${base}/due`, { due_date: dueInput.value });
+      });
+    }
+    if (submittedAtInput) submittedAtInput.addEventListener('change', saveSubmission);
+    if (submissionMethodInput) submissionMethodInput.addEventListener('change', saveSubmission);
+    // 保存先リンクの「開く／パスをコピー」ボタン（ロジック本体は共通関数を利用）
+    function updateOpenBtn() {
+      if (!openBtn || !linkInput) return;
+      applySmartLinkMode(openBtn, linkInput.value.trim());
+    }
+    updateOpenBtn();
+    if (openBtn) {
+      openBtn.addEventListener('click', () => {
+        handleSmartLinkClick(openBtn, linkInput ? linkInput.value.trim() : '');
+      });
+    }
+    if (linkInput) {
+      linkInput.addEventListener('change', () => {
+        updateOpenBtn();
+        postJSON(`${base}/link`, { link_url: linkInput.value });
+      });
+    }
+    if (noteInput) {
+      noteInput.addEventListener('change', () => {
+        postJSON(`${base}/note`, { status_note: noteInput.value });
+      });
+    }
+
+    // ---- 協力業者への依頼 ----
+    const contractorName = row.querySelector('.contractor-name');
+    const contractorDate = row.querySelector('.contractor-date');
+    const contractorDetail = row.querySelector('.contractor-detail');
+    function saveContractor() {
+      postJSON(`${base}/contractor`, {
+        contractor_name: contractorName ? contractorName.value : '',
+        requested_at: contractorDate ? contractorDate.value : '',
+        request_detail: contractorDetail ? contractorDetail.value : '',
+      });
+    }
+    if (contractorName) contractorName.addEventListener('change', saveContractor);
+    if (contractorDate) contractorDate.addEventListener('change', saveContractor);
+    if (contractorDetail) contractorDetail.addEventListener('change', saveContractor);
+  });
+
+  // ---- 保存先リンク欄のドラッグ＆ドロップ ----
+  // ブラウザの仕様上、ドロップされたファイル/フォルダの完全なパス（\\server\...等）は取得できないため、
+  // ファイル名・フォルダ名だけを自動入力する（完全なパスは手入力での補完が必要）。
+  document.querySelectorAll('.dropzone').forEach((el) => {
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      let name = '';
+      if (e.dataTransfer.items && e.dataTransfer.items.length) {
+        const item = e.dataTransfer.items[0];
+        const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+        if (entry) name = entry.name;
+      }
+      if (!name && e.dataTransfer.files && e.dataTransfer.files.length) {
+        name = e.dataTransfer.files[0].name;
+      }
+      if (name) {
+        el.value = el.value.trim() ? el.value : name;
+        el.dispatchEvent(new Event('change'));
+      }
+    });
+  });
+
+  // ---- 画面配色（白基調／黒基調／青基調をメンバーごとに選択・保存） ----
+  const themeSwitcher = document.querySelector('.theme-switcher');
+  if (themeSwitcher) {
+    function markActiveTheme(theme) {
+      themeSwitcher.querySelectorAll('.theme-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.themeChoice === theme);
+      });
+    }
+    markActiveTheme(themeSwitcher.dataset.current || 'white');
+    themeSwitcher.querySelectorAll('.theme-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const theme = btn.dataset.themeChoice;
+        document.documentElement.setAttribute('data-theme', theme);
+        markActiveTheme(theme);
+        postJSON('/api/theme', { theme });
+      });
+    });
+  }
+
+  // ---- チェックリスト区分の「すべて開く／すべて閉じる」 ----
+  const expandAllBtn = document.getElementById('expandAllCategories');
+  const collapseAllBtn = document.getElementById('collapseAllCategories');
+  if (expandAllBtn) {
+    expandAllBtn.addEventListener('click', () => {
+      document.querySelectorAll('.checklist-category').forEach((d) => { d.open = true; });
+    });
+  }
+  if (collapseAllBtn) {
+    collapseAllBtn.addEventListener('click', () => {
+      document.querySelectorAll('.checklist-category').forEach((d) => { d.open = false; });
+    });
+  }
+
+  // ---- 基本情報（自動保存：どの項目を変更しても保存ボタン無しですぐ保存される） ----
+  const basicInfoForm = document.getElementById('basicInfoForm');
+  if (basicInfoForm) {
+    const projectId = basicInfoForm.dataset.project;
+    function saveBasicInfo() {
+      const body = {};
+      basicInfoForm.querySelectorAll('.basic-info-field').forEach((el) => {
+        body[el.name] = el.value;
+      });
+      postJSON(`/api/projects/${projectId}/info`, body);
+    }
+    basicInfoForm.querySelectorAll('.basic-info-field').forEach((el) => {
+      el.addEventListener('change', saveBasicInfo);
+    });
+  }
+
+  // ---- 体制・工程 ----
+  document.querySelectorAll('.tech-col').forEach((col) => {
+    const projectId = col.dataset.project;
+    const role = col.dataset.role;
+    const nameInput = col.querySelector('.tech-name');
+    const startInput = col.querySelector('.tech-start');
+    const endInput = col.querySelector('.tech-end');
+    const exclusiveInputs = col.querySelectorAll('.tech-exclusive');
+
+    function save() {
+      const exclusive = col.querySelector('.tech-exclusive:checked')
+        ? col.querySelector('.tech-exclusive:checked').value
+        : 'true';
+      postJSON(`/api/projects/${projectId}/technicians/${encodeURIComponent(role)}`, {
+        person_name: nameInput.value,
+        exclusive,
+        start_date: startInput.value,
+        end_date: endInput.value,
+      });
+    }
+
+    nameInput.addEventListener('change', save);
+    startInput.addEventListener('change', save);
+    endInput.addEventListener('change', save);
+    exclusiveInputs.forEach((r) => r.addEventListener('change', save));
+  });
+
+  // ---- メンバー管理：編集フォームの開閉 ----
+  document.querySelectorAll('.user-edit-toggle').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const row = document.querySelector(`.user-edit-row[data-user-id="${btn.dataset.userId}"]`);
+      if (!row) return;
+      row.style.display = row.style.display === 'none' ? '' : 'none';
+    });
+  });
+})();
