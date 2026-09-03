@@ -1,472 +1,84 @@
-:root {
-  /* 白基調（既定） */
-  --bg: #f6f7f9;
-  --card: #ffffff;
-  --border: #e2e5ea;
-  --text: #1f2430;
-  --muted: #6b7280;
-  --accent: #2563eb;
-  --accent-dark: #1d4ed8;
-  --green: #16a34a;
-  --red: #dc2626;
-  --blue: #2563eb;
-  --amber: #d97706;
-  --purple: #7c3aed;
-  --track-bg: #f1f5f9;
-  --topbar-bg: #111827;
-  --topbar-text: #ffffff;
-  --topbar-muted: #9ca3af;
-  --input-bg: #ffffff;
-  --shadow: 0 1px 3px rgba(15, 23, 42, .06);
-}
-html[data-theme="dark"] {
-  /* 黒基調（目に優しい暗色） */
-  --bg: #15171b;
-  --card: #1e2126;
-  --border: #2c3138;
-  --text: #e7e9ec;
-  --muted: #9aa3af;
-  --accent: #3b82f6;
-  --accent-dark: #60a5fa;
-  --green: #34d399;
-  --red: #f87171;
-  --blue: #60a5fa;
-  --amber: #fbbf24;
-  --purple: #a78bfa;
-  --track-bg: #262a31;
-  --topbar-bg: #0b0d10;
-  --topbar-text: #f3f4f6;
-  --topbar-muted: #9aa3af;
-  --input-bg: #23272e;
-  --shadow: 0 1px 3px rgba(0, 0, 0, .4);
-}
-html[data-theme="blue"] {
-  /* 青基調（明るいが白より刺激の少ない淡い青） */
-  --bg: #e8f0fa;
-  --card: #f6faff;
-  --border: #cbdcf0;
-  --text: #1b2b3a;
-  --muted: #5c7387;
-  --accent: #2563eb;
-  --accent-dark: #1d4ed8;
-  --green: #16a34a;
-  --red: #dc2626;
-  --blue: #2563eb;
-  --amber: #b45309;
-  --purple: #7c3aed;
-  --track-bg: #dbe8f7;
-  --topbar-bg: #163353;
-  --topbar-text: #ffffff;
-  --topbar-muted: #aecbe6;
-  --input-bg: #ffffff;
-  --shadow: 0 1px 3px rgba(22, 51, 83, .12);
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  transition: background-color .15s, color .15s;
-}
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
+<%- include('header', { title: '書類テンプレート' }) %>
+<h1>書類テンプレート</h1>
+<p class="helptext">ここにある雛形は必ず「コピーしてから」使用してください。元のファイルを直接編集すると、他の案件で使うときに困ります。プレビューはMicrosoft Office Onlineの画面上で開くだけなので、内容の確認だけならダウンロード不要です。</p>
 
-/* ---- 全体レイアウト（左サイドバー構成。CraftBank office等の業務ツールを参考にした配置） ---- */
-.app-shell { display: flex; min-height: 100vh; align-items: stretch; }
+<div class="project-grid">
+  <% templates.forEach(t => { %>
+    <div class="card">
+      <h2><%= t.label %></h2>
+      <p class="field-desc"><%= t.description %></p>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <a class="btn" href="<%= t.viewerUrl %>" target="_blank" rel="noopener">👁 プレビュー</a>
+        <a class="btn secondary" href="<%= t.fileUrl %>" download>⬇ ダウンロード</a>
+      </div>
+    </div>
+  <% }) %>
+</div>
 
-.sidebar {
-  width: 230px;
-  flex-shrink: 0;
-  background: var(--card);
-  border-right: 1px solid var(--border);
-  padding: 16px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  transition: background-color .15s, border-color .15s;
-  /* 画面をスクロールしてもサイドバーは固定表示されるようにする */
-  position: sticky;
-  top: 0;
-  align-self: flex-start;
-  height: 100vh;
-  overflow-y: auto;
-}
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px 16px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-.sidebar-brand-icon { font-size: 22px; line-height: 1; }
-.sidebar-brand-text { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.5; }
-.sidebar-brand-text small { font-weight: 400; color: var(--muted); font-size: 11px; }
-.sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
-.sidebar-nav a {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.sidebar-nav a:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--text); text-decoration: none; }
-.sidebar-nav a.active { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
-.nav-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+<div class="card">
+  <h2>低入札価格調査 関連書類のテンプレート</h2>
+  <p class="helptext">実際に低入札価格調査で提出した様式一式です。<strong>免許番号・取引銀行・保証会社などの自社の基本情報はあらかじめ入力済み</strong>なので、次に低入札対象になった案件では、案件名・日付・数量・金額・記述内容など<strong>案件固有の部分だけを書き換えて</strong>使えます。他の雛形と同様、<strong>必ず「コピーしてから」編集してください</strong>（この元ファイルを直接編集すると次回使えなくなります）。書式番号は案件詳細ページの「低入札価格調査 関連書類」欄の項目と対応しています。</p>
+  <div class="project-grid">
+    <% lowBidTemplates.forEach(t => { %>
+      <div class="card">
+        <h2 style="font-size:14px;"><%= t.label %></h2>
+        <p class="field-desc"><%= t.description %></p>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <a class="btn" href="<%= t.fileUrl %>" target="_blank" rel="noopener">👁 プレビュー</a>
+          <a class="btn secondary" href="<%= t.fileUrl %>" download>⬇ ダウンロード</a>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+</div>
 
-.main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+<div class="card">
+  <h2>提出書類の参考例（過去の提出データ）</h2>
+  <p class="helptext">実際に提出した書類の内容や書き方を、書類名ごとに自由に貼り付けて残せます。全メンバーが見られるので、「この書類はこんな感じで出している」という参考にしてください。案件を問わず、チェックリスト項目・必須書類のどれについても追加できます。</p>
+  <% if (sampleError) { %><div class="error"><%= sampleError %></div><% } %>
 
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 14px;
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
-  padding: 10px 24px;
-}
-.topbar .user { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 10px; }
-.topbar form { display: inline; }
-.topbar button.link {
-  background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 0;
-}
-.topbar button.link:hover { color: var(--text); text-decoration: underline; }
+  <% const labels = Object.keys(samplesByLabel); %>
+  <% if (labels.length === 0) { %>
+    <p class="helptext">まだ参考例が登録されていません。下のフォームから追加してください。</p>
+  <% } %>
+  <% labels.forEach(label => { %>
+    <details class="checklist-category">
+      <summary><%= label %> <span class="cat-count">(<%= samplesByLabel[label].length %>件)</span></summary>
+      <% samplesByLabel[label].forEach(s => { %>
+        <div class="sample-item">
+          <div class="sample-meta">
+            <% if (s.project_name) { %><strong><%= s.project_name %></strong><% } %>
+            <span class="helptext"><%= s.created_by_name || '不明' %> — <%= new Date(s.created_at).toLocaleString('ja-JP') %></span>
+          </div>
+          <% if (s.content) { %><p class="sample-content"><%= s.content %></p><% } %>
+          <% if (s.link_url) { %><a class="btn secondary" href="<%= s.link_url %>" target="_blank" rel="noopener">📁 実ファイルを開く</a><% } %>
+          <form method="post" action="/templates/samples/<%= s.id %>/delete" style="display:inline"
+            onsubmit="return confirm('この参考例を削除しますか？')">
+            <button class="btn secondary" type="submit">削除</button>
+          </form>
+        </div>
+      <% }) %>
+    </details>
+  <% }) %>
 
-.theme-switcher { display: inline-flex; gap: 2px; background: color-mix(in srgb, var(--text) 6%, transparent); border-radius: 999px; padding: 2px; }
-.theme-switcher .theme-btn {
-  background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1;
-  padding: 5px 7px; border-radius: 999px; color: var(--muted);
-}
-.theme-switcher .theme-btn.active { background: color-mix(in srgb, var(--accent) 18%, var(--card)); color: var(--accent); }
-.theme-switcher .theme-btn:hover { color: var(--text); }
+  <h3 style="font-size:14px;margin:20px 0 4px;">参考例を追加</h3>
+  <form method="post" action="/templates/samples">
+    <label>書類名 *</label>
+    <input type="text" name="doc_label" required placeholder="例: 工事費内訳書、施工体制台帳 など">
+    <label>参考にした案件名（任意）</label>
+    <input type="text" name="project_name" placeholder="例: 松江刑務所LED化改修工事">
+    <label>内容・書き方のメモ（貼り付け可）</label>
+    <textarea name="content" rows="6" placeholder="実際に提出した書類の内容や、記入の仕方のポイントなどを貼り付けてください"></textarea>
+    <label>実ファイルの保存先リンク（任意）</label>
+    <input type="text" name="link_url" placeholder="共有サーバー上の実ファイルへのリンクがあれば">
+    <div style="margin-top:14px;">
+      <button class="btn" type="submit">追加</button>
+    </div>
+  </form>
+</div>
 
-@media (max-width: 860px) {
-  .app-shell { flex-direction: column; }
-  .sidebar {
-    width: 100%; flex-direction: row; align-items: center; overflow-x: auto; overflow-y: visible;
-    padding: 8px; gap: 2px; height: auto; z-index: 20;
-  }
-  .sidebar-brand { display: none; }
-  .sidebar-nav { flex-direction: row; }
-  .sidebar-nav a { flex-direction: column; gap: 2px; font-size: 10px; padding: 6px 10px; white-space: nowrap; }
-}
-
-.container { max-width: 1100px; margin: 0 auto; padding: 24px 24px 60px; width: 100%; }
-
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 18px 20px;
-  margin-bottom: 16px;
-  box-shadow: var(--shadow);
-  transition: background-color .15s, border-color .15s;
-}
-
-h1 { font-size: 20px; margin: 0 0 16px; }
-h2 { font-size: 16px; margin: 0 0 10px; }
-
-.btn {
-  display: inline-block;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-}
-.btn:hover { background: var(--accent-dark); text-decoration: none; }
-.btn.secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
-.btn.secondary:hover { background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
-
-input[type=text], input[type=password], input[type=date], textarea, select {
-  width: 100%;
-  padding: 7px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: inherit;
-  background: var(--input-bg);
-  color: var(--text);
-}
-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; margin-top: 10px; }
-
-.error { color: var(--red); font-size: 13px; margin: 8px 0; }
-
-.project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
-.project-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
-  cursor: pointer;
-  transition: box-shadow .15s, border-color .15s;
-}
-.project-card:hover { box-shadow: var(--shadow); border-color: var(--accent); text-decoration: none; }
-.project-card .name { font-weight: 700; font-size: 15px; color: var(--text); margin-bottom: 4px; }
-.project-card .agency { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
-.project-card .stage {
-  display: inline-block;
-  background: color-mix(in srgb, var(--accent) 14%, var(--card));
-  color: var(--accent);
-  font-size: 12px; padding: 2px 8px; border-radius: 999px; margin-bottom: 10px;
-}
-.progress-bar { background: var(--track-bg); border-radius: 999px; height: 8px; overflow: hidden; margin: 6px 0; }
-.progress-bar > div { background: var(--green); height: 100%; }
-.meta-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 6px; }
-.badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; margin-left: 6px; }
-.badge.red { background: color-mix(in srgb, var(--red) 18%, var(--card)); color: var(--red); }
-.badge.blue { background: color-mix(in srgb, var(--blue) 18%, var(--card)); color: var(--blue); }
-.badge.amber { background: color-mix(in srgb, var(--amber) 18%, var(--card)); color: var(--amber); }
-.badge.green { background: color-mix(in srgb, var(--green) 18%, var(--card)); color: var(--green); }
-.badge.purple { background: color-mix(in srgb, var(--purple) 18%, var(--card)); color: var(--purple); }
-
-.folder-link-row { margin-top: 8px; font-size: 12px; }
-.folder-link-row a { color: var(--accent); }
-.folder-link-row button {
-  color: var(--accent); background: none; border: none; padding: 0;
-  font: inherit; cursor: pointer; text-decoration: underline;
-}
-
-.assignee { font-size: 12px; color: var(--muted); margin: 2px 0 10px; }
-
-/* 案件詳細ページ：書類管理（左）とやり取り履歴（右）の2カラムレイアウト。
-   やり取り履歴は件数が増えても画面全体が縦に伸びないよう、右側だけ画面に固定表示（sticky）にし、
-   一覧部分のみ内部スクロールにしてある（左側の書類確認のために毎回下までスクロールしなくて済むように）。 */
-.project-layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
-.project-main-col { min-width: 0; }
-.project-side-col { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
-@media (max-width: 980px) {
-  .project-layout { grid-template-columns: 1fr; }
-  .project-side-col { position: static; max-height: none; overflow-y: visible; }
-}
-
-.contact-timeline { display: flex; flex-direction: column; gap: 10px; max-height: 46vh; overflow-y: auto; padding-right: 4px; }
-@media (max-width: 980px) { .contact-timeline { max-height: none; overflow-y: visible; } }
-.contact-entry {
-  border: 1px solid var(--border); border-left-width: 4px; border-radius: 8px;
-  padding: 10px 12px; background: var(--card);
-}
-.contact-entry.contact-outgoing { border-left-color: var(--accent); }
-.contact-entry.contact-incoming { border-left-color: var(--green); }
-.contact-entry-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
-.contact-date { font-weight: 600; }
-.contact-method-badge, .contact-direction-badge {
-  display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 12%, var(--card)); color: var(--accent);
-}
-.contact-entry.contact-incoming .contact-direction-badge {
-  background: color-mix(in srgb, var(--green) 18%, var(--card)); color: var(--green);
-}
-.contact-counterpart { color: var(--muted); }
-.contact-summary { margin: 6px 0; white-space: pre-wrap; }
-.contact-entry-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-.contact-meta { font-size: 11px; color: var(--muted); }
-.contact-open-link {
-  color: var(--accent); background: none; border: 1px solid var(--border); border-radius: 999px;
-  padding: 2px 10px; font: inherit; font-size: 11px; cursor: pointer; margin: 0 0 6px; display: inline-block;
-}
-.contact-open-link:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
-
-.lowbid-toggle-btn.active {
-  background: color-mix(in srgb, var(--amber) 18%, var(--card));
-  color: var(--amber);
-  border-color: color-mix(in srgb, var(--amber) 45%, var(--card));
-}
-.lowbid-details { border: none; padding: 0; margin-bottom: 0; }
-.lowbid-details summary { font-size: 16px; font-weight: 700; padding: 0 0 10px; }
-.lowbid-details[open] summary { margin-bottom: 4px; }
-.lowbid-badge {
-  display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 999px;
-  background: color-mix(in srgb, var(--amber) 18%, var(--card)); color: var(--amber); margin-left: 8px;
-}
-
-.due-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
-.due-badge.green { background: color-mix(in srgb, var(--green) 18%, var(--card)); color: var(--green); }
-.due-badge.red { background: color-mix(in srgb, var(--red) 18%, var(--card)); color: var(--red); }
-
-table { border-collapse: collapse; width: 100%; }
-.table-scroll { overflow-x: auto; }
-.table-scroll table { min-width: 480px; }
-th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--border); font-size: 13px; }
-th { color: var(--muted); font-weight: 600; }
-tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
-
-.sample-item { border-top: 1px solid var(--border); padding: 10px 0; }
-.sample-item:first-of-type { border-top: none; }
-.sample-meta { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
-.sample-content { white-space: pre-wrap; background: color-mix(in srgb, var(--accent) 5%, var(--card)); border-radius: 6px; padding: 10px 12px; font-size: 13px; margin: 0 0 8px; }
-
-.user-actions { display: flex; gap: 8px; }
-.user-inactive-row { opacity: .55; }
-.user-edit-row td { padding-top: 0; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
-.user-edit-form { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; background: color-mix(in srgb, var(--accent) 6%, var(--card)); border-radius: 8px; padding: 12px; }
-.user-edit-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); margin: 0; }
-.user-edit-form input { margin: 0; }
-
-.checklist-category { margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; padding: 4px 12px 4px; transition: border-color .15s; }
-.checklist-category[open] { padding-bottom: 10px; border-color: var(--accent); }
-.checklist-category summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text); padding: 10px 0; list-style: revert; }
-.checklist-category summary:hover { color: var(--accent); }
-.checklist-category .cat-count { font-weight: 400; color: var(--muted); font-size: 12px; }
-
-/* ステータス5段階の共通スタイル（プロジェクト一覧・チェックリスト・必須書類で共通利用） */
-.status-select { width: auto; min-width: 88px; flex-shrink: 0; font-size: 13px; padding: 4px 8px; font-weight: 600; border-width: 1px; }
-.status-select.status-not_started { background: var(--card); color: var(--muted); border-color: var(--border); }
-.status-select.status-in_progress {
-  background: color-mix(in srgb, var(--amber) 18%, var(--card)); color: var(--amber);
-  border-color: color-mix(in srgb, var(--amber) 40%, var(--card));
-}
-.status-select.status-submitted {
-  background: color-mix(in srgb, var(--green) 18%, var(--card)); color: var(--green);
-  border-color: color-mix(in srgb, var(--green) 40%, var(--card));
-}
-.status-select.status-revising {
-  background: color-mix(in srgb, var(--red) 18%, var(--card)); color: var(--red);
-  border-color: color-mix(in srgb, var(--red) 40%, var(--card));
-}
-.status-select.status-not_applicable {
-  background: color-mix(in srgb, var(--purple) 18%, var(--card)); color: var(--purple);
-  border-color: color-mix(in srgb, var(--purple) 40%, var(--card));
-}
-/* 必須書類専用の3段階（未着手／取得中／保存済み）。取得中はin_progressと、保存済みはsubmittedと同系色 */
-.status-select.status-obtaining {
-  background: color-mix(in srgb, var(--amber) 18%, var(--card)); color: var(--amber);
-  border-color: color-mix(in srgb, var(--amber) 40%, var(--card));
-}
-.status-select.status-saved {
-  background: color-mix(in srgb, var(--green) 18%, var(--card)); color: var(--green);
-  border-color: color-mix(in srgb, var(--green) 40%, var(--card));
-}
-
-/* 必須書類・チェックリスト項目 共通の1行コンポーネント（field_row.ejs） */
-.field-row {
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  font-size: 13px;
-  transition: border-color .15s;
-}
-.field-row:has(.status-select.status-in_progress) { border-left-color: var(--amber); }
-.field-row:has(.status-select.status-submitted) { border-left-color: var(--green); }
-.field-row:has(.status-select.status-revising) { border-left-color: var(--red); }
-.field-row:has(.status-select.status-not_applicable) { border-left-color: var(--purple); }
-.field-row:has(.status-select.status-obtaining) { border-left-color: var(--amber); }
-.field-row:has(.status-select.status-saved) { border-left-color: var(--green); }
-.field-row-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.field-row-name { font-weight: 600; }
-.field-row-head .note { color: var(--muted); font-size: 12px; }
-.field-desc { color: var(--muted); font-size: 12px; margin: 6px 0 0; line-height: 1.5; }
-.field-row-controls { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
-.field-row-controls .mini-label { font-size: 11px; color: var(--muted); margin: 0; display: flex; flex-direction: column; gap: 3px; }
-.field-row-controls input[type=date] { width: 145px; }
-.field-row-controls input[type=text] { width: 200px; }
-.field-row-controls .field-submission-method { width: 170px; }
-.field-row-controls .field-open-link { padding: 6px 12px; font-size: 13px; }
-.field-note-wrap { margin-top: 8px; }
-.field-note-wrap .mini-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
-.field-note-wrap textarea { width: 100%; font-family: inherit; }
-.field-meta { color: var(--muted); font-size: 11px; margin-top: 6px; }
-
-.precedent-box { margin-top: 8px; font-size: 12px; }
-.precedent-box summary { cursor: pointer; color: var(--accent); }
-.precedent-box ul { margin: 6px 0 0 18px; padding: 0; }
-.precedent-box li { margin-bottom: 3px; }
-
-.contractor-box { margin-top: 8px; font-size: 12px; border-top: 1px dashed var(--border); padding-top: 6px; }
-.contractor-box summary { cursor: pointer; color: var(--amber); font-weight: 600; }
-.contractor-fields { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
-.contractor-fields .mini-label { font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
-.contractor-fields input[type=text] { width: 180px; }
-.contractor-fields input[type=date] { width: 150px; }
-.contractor-fields textarea { width: 280px; font-family: inherit; }
-
-.dropzone.drag-over { border-color: var(--accent) !important; background: color-mix(in srgb, var(--accent) 10%, var(--input-bg)); }
-.basic-info-autosave-note { font-size: 12px; color: var(--green); }
-
-.deadline-panel table { margin-top: 8px; }
-
-/* 年間工程表（着工日〜完成期日の施工期間バー＋技術者の配置期間バーを同じ行に統合表示） */
-.schedule-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
-.legend-swatch { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
-.legend-swatch.build { background: var(--accent); }
-.legend-swatch.tech { background: color-mix(in srgb, var(--muted) 55%, var(--card)); height: 7px; }
-.legend-swatch.tech.red { background: var(--red); }
-.legend-swatch.tech.blue { background: var(--blue); }
-.legend-swatch.today { background: var(--red); width: 2px; height: 14px; }
-
-.schedule-scroll { overflow-x: auto; }
-.schedule-chart { min-width: 900px; }
-.schedule-months { display: flex; border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 6px; }
-.schedule-months-spacer { width: 220px; flex-shrink: 0; }
-.schedule-months-track { position: relative; flex: 1; height: 20px; }
-.schedule-month-tick { position: absolute; top: 0; font-size: 11px; color: var(--muted); border-left: 1px solid var(--border); padding-left: 4px; height: 100%; }
-
-.schedule-row { display: flex; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-.schedule-row-label { width: 220px; flex-shrink: 0; padding-right: 8px; padding-top: 4px; }
-.schedule-row-label .note { color: var(--muted); font-size: 11px; display: block; }
-.schedule-row-track { position: relative; flex: 1; display: flex; flex-direction: column; gap: 5px; padding: 2px 0; }
-.schedule-bar-lane { position: relative; background: var(--track-bg); border-radius: 4px; height: 22px; }
-.schedule-bar-lane.tech { height: 16px; }
-.schedule-bar { position: absolute; top: 2px; height: 18px; border-radius: 4px; background: var(--accent); }
-.schedule-bar.build { background: var(--accent); }
-.schedule-bar.tech { top: 1px; height: 14px; background: color-mix(in srgb, var(--muted) 55%, var(--card)); }
-.schedule-bar.tech.red { background: var(--red); }
-.schedule-bar.tech.blue { background: var(--blue); }
-.schedule-bar-dates { position: absolute; left: 100%; top: 0; margin-left: 8px; white-space: nowrap; font-size: 11px; color: var(--text); line-height: 18px; }
-.schedule-bar-dates.tech-label { line-height: 14px; color: var(--muted); }
-.schedule-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red); z-index: 2; }
-.schedule-missing { color: var(--red); font-size: 12px; padding: 4px 0; }
-
-/* 2カラム化（.project-layout）で本文側の幅が狭くなった場合でも、日付欄などが列幅からはみ出して
-   右側のやり取り履歴と重なって見えることがないよう、列数を固定せず自動で折り返す形にしてある。 */
-.tech-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
-.tech-col { border: 1px solid var(--border); border-radius: 8px; padding: 10px; min-width: 0; }
-.tech-col h4 { margin: 0 0 8px; font-size: 13px; }
-.tech-col .switch { display: flex; gap: 12px; margin: 6px 0; font-size: 13px; flex-wrap: wrap; }
-.tech-col .dates { display: flex; gap: 8px; flex-wrap: wrap; }
-.tech-col .dates > div { min-width: 118px; flex: 1 1 118px; }
-.tech-col input[type=date] { width: 100%; min-width: 0; box-sizing: border-box; }
-
-.save-indicator { font-size: 12px; color: var(--muted); }
-.save-indicator.saved { color: var(--green); }
-
-.helptext { color: var(--muted); font-size: 12px; margin-top: 4px; }
-
-.form-grid { display: grid; gap: 12px; margin-top: 4px; }
-.form-grid-2 { grid-template-columns: repeat(2, 1fr); }
-.form-grid-3 { grid-template-columns: repeat(3, 1fr); }
-
-/* ---- モバイル対応（スマホでも問題なく閲覧・操作できるようにする） ---- */
-@media (max-width: 700px) {
-  .container { padding: 14px 12px 48px; }
-  h1 { font-size: 18px; }
-  h2 { font-size: 15px; }
-  .card { padding: 14px; }
-
-  .project-grid { grid-template-columns: 1fr; }
-  .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
-  .tech-grid { grid-template-columns: 1fr; }
-  .contractor-fields { flex-direction: column; align-items: stretch; }
-  .contractor-fields input[type=text],
-  .contractor-fields input[type=date],
-  .contractor-fields textarea { width: 100%; }
-
-  .field-row-controls { flex-direction: column; align-items: stretch; }
-  .field-row-controls input[type=date],
-  .field-row-controls input[type=text],
-  .field-row-controls .field-submission-method { width: 100%; }
-  .field-row-controls .field-open-link { align-self: flex-start; }
-
-  .user-edit-form { flex-direction: column; align-items: stretch; }
-
-  .topbar { padding: 8px 12px; flex-wrap: wrap; gap: 8px; }
-  .topbar .user { font-size: 12px; }
-}
+<div class="card">
+  <h2>今後追加予定</h2>
+  <p class="helptext">契約書・見積書などの雛形も、必要なファイルを教えていただければ順次ここに追加していきます。将来的には仕様書から内容を読み取って自動作成するところまで対応予定です（現在は雛形のプレビューのみ）。</p>
+</div>
+<%- include('footer') %>
