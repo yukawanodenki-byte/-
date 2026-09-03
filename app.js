@@ -290,6 +290,7 @@
     const projectId = col.dataset.project;
     const role = col.dataset.role;
     const nameInput = col.querySelector('.tech-name');
+    const engineerSelect = col.querySelector('.tech-engineer');
     const startInput = col.querySelector('.tech-start');
     const endInput = col.querySelector('.tech-end');
     const exclusiveInputs = col.querySelectorAll('.tech-exclusive');
@@ -300,17 +301,145 @@
         : 'true';
       postJSON(`/api/projects/${projectId}/technicians/${encodeURIComponent(role)}`, {
         person_name: nameInput.value,
+        engineer_id: engineerSelect ? engineerSelect.value : '',
         exclusive,
         start_date: startInput.value,
         end_date: endInput.value,
       });
     }
 
+    // 技術者マスタから選んだときは氏名欄をマスタの表記で埋めて読み取り専用にする
+    // （選択を外せば従来どおり手入力できる）。
+    if (engineerSelect) {
+      engineerSelect.addEventListener('change', () => {
+        if (engineerSelect.value) {
+          const label = engineerSelect.options[engineerSelect.selectedIndex].textContent.trim();
+          nameInput.value = label;
+          nameInput.readOnly = true;
+        } else {
+          nameInput.readOnly = false;
+        }
+        save();
+      });
+    }
     nameInput.addEventListener('change', save);
     startInput.addEventListener('change', save);
     endInput.addEventListener('change', save);
     exclusiveInputs.forEach((r) => r.addEventListener('change', save));
   });
+
+  // ---- 発注機関の類似ワード検索（案件の基本情報欄） ----
+  // 入力するたびにサーバーへ問い合わせ、表記が多少違っても近い機関を候補に出す。
+  // 候補を選ぶとマスタのIDが紐付き、「同系統発注機関での実績」の判定が正確になる。
+  document.querySelectorAll('.agency-picker').forEach((picker) => {
+    const input = picker.querySelector('.agency-input');
+    const idInput = picker.querySelector('.agency-id-input');
+    const suggest = picker.querySelector('.agency-suggest');
+    const note = picker.querySelector('.agency-picker-note');
+    const projectId = picker.dataset.project;
+    let timer = null;
+    let lastQuery = '';
+
+    function hideSuggest() {
+      suggest.hidden = true;
+      suggest.innerHTML = '';
+    }
+
+    function renderSuggest(results, query) {
+      suggest.innerHTML = '';
+      const exact = results.some((r) => r.name === query);
+      if (results.length === 0 && !query) return hideSuggest();
+
+      results.forEach((r) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'agency-suggest-item';
+        item.innerHTML = `<strong></strong> <span class="helptext"></span>`;
+        item.querySelector('strong').textContent = r.name;
+        item.querySelector('span').textContent = `${r.kindLabel}${r.group_key ? ' / ' + r.group_key : ''}`;
+        item.addEventListener('click', () => {
+          input.value = r.name;
+          idInput.value = r.id;
+          hideSuggest();
+          if (note) note.textContent = '✓ 発注機関マスタに登録済みの機関と紐付きました。';
+          input.dispatchEvent(new Event('change'));
+        });
+        suggest.appendChild(item);
+      });
+
+      // 候補に完全一致が無ければ、その場でマスタに登録できるボタンを出す
+      if (query && !exact) {
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'agency-suggest-item agency-suggest-add';
+        add.textContent = `＋「${query}」を発注機関マスタに登録`;
+        add.addEventListener('click', async () => {
+          const res = await postJSON(`/api/projects/${projectId}/agency-register`, { name: query });
+          if (res.ok) {
+            const data = await res.json();
+            idInput.value = data.agencyId;
+            hideSuggest();
+            if (note) note.textContent = '✓ 発注機関マスタに登録し、この案件と紐付けました。';
+          }
+        });
+        suggest.appendChild(add);
+      }
+      suggest.hidden = suggest.children.length === 0;
+    }
+
+    input.addEventListener('input', () => {
+      idInput.value = ''; // 手で書き換えたら紐付けは一旦解除（選び直すか、完全一致なら保存時に再紐付けされる）
+      const query = input.value.trim();
+      clearTimeout(timer);
+      if (!query) return hideSuggest();
+      timer = setTimeout(async () => {
+        if (query === lastQuery) return;
+        lastQuery = query;
+        try {
+          const res = await fetch(`/api/agencies/search?q=${encodeURIComponent(query)}`);
+          const data = await res.json();
+          renderSuggest(data.results || [], query);
+        } catch (e) {
+          hideSuggest();
+        }
+      }, 250);
+    });
+
+    input.addEventListener('blur', () => setTimeout(hideSuggest, 200));
+  });
+
+  // ---- 一覧の行内編集フォームの開閉（技術者マスタ・発注機関マスタ） ----
+  document.querySelectorAll('.row-edit-toggle').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const row = document.getElementById(btn.dataset.target);
+      if (!row) return;
+      row.style.display = row.style.display === 'none' ? '' : 'none';
+    });
+  });
+
+  // ---- 受注実績を書式211号用にタブ区切りでコピー ----
+  const copyWorksBtn = document.getElementById('copyWorksTable');
+  if (copyWorksBtn) {
+    copyWorksBtn.addEventListener('click', () => {
+      const rows = Array.from(document.querySelectorAll('#worksTable tbody tr'));
+      const lines = ['工事名\t発注者\t請負金額\t工期'];
+      rows.forEach((tr) => {
+        const c = tr.querySelectorAll('td');
+        const name = c[1].querySelector('a') ? c[1].querySelector('a').textContent.trim() : c[1].textContent.trim();
+        lines.push([name, c[2].textContent.trim(), c[4].textContent.trim(), c[5].textContent.trim().replace(/\s+/g, ' ')].join('\t'));
+      });
+      const text = lines.join('\n');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          const original = copyWorksBtn.textContent;
+          copyWorksBtn.textContent = 'コピーしました';
+          setTimeout(() => { copyWorksBtn.textContent = original; }, 1500);
+        }).catch(() => alert('コピーに失敗しました。表を選択して手動でコピーしてください。'));
+      } else {
+        alert('このブラウザは自動コピーに対応していません。表を選択して手動でコピーしてください。');
+      }
+    });
+  }
 
   // ---- メンバー管理：編集フォームの開閉 ----
   document.querySelectorAll('.user-edit-toggle').forEach((btn) => {

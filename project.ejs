@@ -24,7 +24,19 @@
     <label>案件名</label>
     <input type="text" name="name" class="basic-info-field" value="<%= project.name %>">
     <label>発注機関</label>
-    <input type="text" name="agency" class="basic-info-field" value="<%= project.agency || '' %>">
+    <div class="agency-picker" data-project="<%= project.id %>">
+      <input type="text" name="agency" class="basic-info-field agency-input" autocomplete="off"
+        value="<%= project.agency || '' %>" placeholder="機関名を入力すると、登録済みの似た機関が候補に出ます">
+      <input type="hidden" name="agency_id" class="basic-info-field agency-id-input" value="<%= project.agency_id || '' %>">
+      <div class="agency-suggest" hidden></div>
+      <p class="helptext agency-picker-note">
+        <% if (project.agency_id) { %>
+          ✓ <a href="/agencies">発注機関マスタ</a>に登録済みの機関と紐付いています。
+        <% } else { %>
+          この機関はまだ<a href="/agencies">発注機関マスタ</a>に登録されていません。登録すると次回から候補に出せます。
+        <% } %>
+      </p>
+    </div>
     <label>契約金額</label>
     <input type="text" name="contract_amount" class="basic-info-field" value="<%= project.contract_amount || '' %>">
     <label>工期</label>
@@ -108,7 +120,14 @@
       <div class="tech-col" data-role="<%= role %>" data-project="<%= project.id %>">
         <h4><%= role %></h4>
         <label>氏名</label>
-        <input type="text" class="tech-name" value="<%= t.person_name || '' %>" placeholder="未配置なら × など">
+        <select class="tech-engineer">
+          <option value="">（マスタから選ぶ）</option>
+          <% engineers.forEach(function (eng) { %>
+            <option value="<%= eng.id %>" <%= t.engineer_id === eng.id ? 'selected' : '' %>><%= eng.name %></option>
+          <% }) %>
+        </select>
+        <input type="text" class="tech-name" value="<%= t.person_name || '' %>"
+          placeholder="未配置なら × など" <%= t.engineer_id ? 'readonly' : '' %>>
         <div class="switch">
           <label style="margin:0;display:flex;align-items:center;gap:4px;">
             <input type="radio" name="exclusive-<%= role %>" class="tech-exclusive" value="true" <%= (t.exclusive === undefined || t.exclusive) ? 'checked' : '' %>> 専任
@@ -130,7 +149,7 @@
       </div>
     <% }) %>
   </div>
-  <p class="helptext">同一氏名の技術者が期間の重なる複数案件に配置されている場合、案件一覧にバッジで表示されます（専任同士＝赤、非専任同士＝青）。</p>
+  <p class="helptext">氏名は<a href="/engineers">技術者マスタ</a>から選ぶと、表記の違いに関係なく同一人物として扱われ、重複配置チェックが正確になります（マスタに無い人は下の欄に直接入力もできます）。同じ人が期間の重なる複数案件に配置されている場合、案件一覧にバッジで表示されます（専任同士＝赤、非専任同士＝青）。</p>
 </div>
 
 <div class="card">

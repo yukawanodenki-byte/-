@@ -179,6 +179,170 @@ app.post('/users/:id/activate', requireAuth, async (req, res) => {
   res.redirect('/users');
 });
 
+// ---- 技術者マスタ（主任技術者・監理技術者・現場代理人の候補者） ----
+app.get('/engineers', requireAuth, async (req, res) => {
+  const engineers = await listEngineers(true);
+  // 現在どの案件に配置されているかを一覧に出す（選定時の判断材料になるため）
+  const { rows: assignments } = await pool.query(
+    `SELECT pt.engineer_id, pt.role, pt.exclusive, pt.start_date, pt.end_date, p.id AS project_id, p.name AS project_name
+     FROM project_technicians pt JOIN projects p ON p.id = pt.project_id
+     WHERE pt.engineer_id IS NOT NULL AND p.archived = false
+     ORDER BY pt.start_date NULLS LAST`
+  );
+  const assignmentsByEngineer = {};
+  for (const a of assignments) {
+    (assignmentsByEngineer[a.engineer_id] ||= []).push(a);
+  }
+  res.render('engineers', {
+    engineers,
+    assignmentsByEngineer,
+    ENGINEER_TYPE_LABELS,
+    message: req.query.message || null,
+    error: req.query.error || null,
+  });
+});
+
+app.post('/engineers', requireAuth, async (req, res) => {
+  const { name, name_kana, employment_type, qualifications, license_number, experience_years, phone, birth_date, note } = req.body;
+  if (!name || !name.trim()) {
+    return res.redirect('/engineers?error=' + encodeURIComponent('氏名は必須です'));
+  }
+  await pool.query(
+    `INSERT INTO engineers (name, name_kana, employment_type, qualifications, license_number, experience_years, phone, birth_date, note, updated_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [
+      name.trim(), (name_kana || '').trim() || null, normalizeEngineerType(employment_type),
+      (qualifications || '').trim() || null, (license_number || '').trim() || null,
+      (experience_years || '').trim() || null, (phone || '').trim() || null,
+      birth_date || null, (note || '').trim() || null, req.session.userId,
+    ]
+  );
+  res.redirect('/engineers?message=' + encodeURIComponent(`技術者「${name.trim()}」を登録しました`));
+});
+
+app.post('/engineers/:id', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { name, name_kana, employment_type, qualifications, license_number, experience_years, phone, birth_date, note } = req.body;
+  if (!name || !name.trim()) {
+    return res.redirect('/engineers?error=' + encodeURIComponent('氏名は必須です'));
+  }
+  await pool.query(
+    `UPDATE engineers SET name=$1, name_kana=$2, employment_type=$3, qualifications=$4, license_number=$5,
+       experience_years=$6, phone=$7, birth_date=$8, note=$9, updated_at=now(), updated_by=$10 WHERE id=$11`,
+    [
+      name.trim(), (name_kana || '').trim() || null, normalizeEngineerType(employment_type),
+      (qualifications || '').trim() || null, (license_number || '').trim() || null,
+      (experience_years || '').trim() || null, (phone || '').trim() || null,
+      birth_date || null, (note || '').trim() || null, req.session.userId, id,
+    ]
+  );
+  // マスタで氏名を直したら、その技術者を配置している案件の表示名もそろえておく
+  await pool.query('UPDATE project_technicians SET person_name = $1 WHERE engineer_id = $2', [name.trim(), id]);
+  res.redirect('/engineers?message=' + encodeURIComponent('技術者情報を更新しました'));
+});
+
+// 退職等で候補から外す（過去の配置履歴を壊さないよう、行は消さずactiveをfalseにする）
+app.post('/engineers/:id/toggle-active', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { rows } = await pool.query('UPDATE engineers SET active = NOT active WHERE id = $1 RETURNING name, active', [id]);
+  const e = rows[0];
+  const msg = e ? `${e.name} を${e.active ? '選択候補に戻しました' : '選択候補から外しました'}` : '更新しました';
+  res.redirect('/engineers?message=' + encodeURIComponent(msg));
+});
+
+// ---- 発注機関マスタ ----
+app.get('/agencies', requireAuth, async (req, res) => {
+  const all = (await listAgencies()).map((a) => ({
+    // group_key（系統）が未設定の機関は、機関名から自動判定した系統を表示に使う
+    // （既存案件から一括取り込みした機関は未設定のままなので、ここで補って見せる）
+    ...a,
+    autoGroupKey: a.group_key || agencyGroup(a.name),
+  }));
+  const q = (req.query.q || '').trim();
+  const agencies = q ? searchAgencyList(all, q, 100) : all;
+  // 各機関の案件数（NJSSモドキの監視機関ページと同じく、実績の多い機関が分かるように）
+  const { rows: counts } = await pool.query(
+    `SELECT agency_id, COUNT(*)::int AS n FROM projects WHERE agency_id IS NOT NULL GROUP BY agency_id`
+  );
+  const countByAgency = {};
+  counts.forEach((c) => { countByAgency[c.agency_id] = c.n; });
+  res.render('agencies', {
+    agencies,
+    countByAgency,
+    totalCount: all.length,
+    q,
+    AGENCY_KIND_LABELS,
+    AGENCY_GROUPS,
+    message: req.query.message || null,
+    error: req.query.error || null,
+  });
+});
+
+app.post('/agencies', requireAuth, async (req, res) => {
+  const { name, kind, group_key, address, contact_name, contact_phone, mailing_address, note } = req.body;
+  if (!name || !name.trim()) {
+    return res.redirect('/agencies?error=' + encodeURIComponent('機関名は必須です'));
+  }
+  const trimmed = name.trim();
+  const { rows: dup } = await pool.query('SELECT id FROM agencies WHERE name = $1', [trimmed]);
+  if (dup.length > 0) {
+    return res.redirect('/agencies?error=' + encodeURIComponent(`「${trimmed}」は既に登録されています`) + '&q=' + encodeURIComponent(trimmed));
+  }
+  await pool.query(
+    `INSERT INTO agencies (name, kind, group_key, address, contact_name, contact_phone, mailing_address, note, updated_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [
+      trimmed, normalizeAgencyKind(kind), (group_key || '').trim() || agencyGroup(trimmed),
+      (address || '').trim() || null, (contact_name || '').trim() || null, (contact_phone || '').trim() || null,
+      (mailing_address || '').trim() || null, (note || '').trim() || null, req.session.userId,
+    ]
+  );
+  res.redirect('/agencies?message=' + encodeURIComponent(`発注機関「${trimmed}」を登録しました`));
+});
+
+app.post('/agencies/:id', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { name, kind, group_key, address, contact_name, contact_phone, mailing_address, note } = req.body;
+  if (!name || !name.trim()) {
+    return res.redirect('/agencies?error=' + encodeURIComponent('機関名は必須です'));
+  }
+  await pool.query(
+    `UPDATE agencies SET name=$1, kind=$2, group_key=$3, address=$4, contact_name=$5, contact_phone=$6,
+       mailing_address=$7, note=$8, updated_at=now(), updated_by=$9 WHERE id=$10`,
+    [
+      name.trim(), normalizeAgencyKind(kind), (group_key || '').trim() || null,
+      (address || '').trim() || null, (contact_name || '').trim() || null, (contact_phone || '').trim() || null,
+      (mailing_address || '').trim() || null, (note || '').trim() || null, req.session.userId, id,
+    ]
+  );
+  await pool.query('UPDATE projects SET agency = $1 WHERE agency_id = $2', [name.trim(), id]);
+  res.redirect('/agencies?message=' + encodeURIComponent('発注機関情報を更新しました'));
+});
+
+app.post('/agencies/:id/delete', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM projects WHERE agency_id = $1', [id]);
+  if (rows[0].n > 0) {
+    return res.redirect('/agencies?error=' + encodeURIComponent(`この機関は${rows[0].n}件の案件で使われているため削除できません`));
+  }
+  await pool.query('DELETE FROM agencies WHERE id = $1', [id]);
+  res.redirect('/agencies?message=' + encodeURIComponent('発注機関を削除しました'));
+});
+
+// 案件の発注機関欄からの類似ワード検索（入力するたびに候補を出す）
+app.get('/api/agencies/search', requireAuth, async (req, res) => {
+  const all = await listAgencies();
+  const results = searchAgencyList(all, req.query.q || '', 10);
+  res.json({
+    ok: true,
+    results: results.map((a) => ({
+      id: a.id, name: a.name, kind: a.kind, kindLabel: AGENCY_KIND_LABELS[a.kind] || a.kind,
+      group_key: a.group_key, mailing_address: a.mailing_address,
+      contact_name: a.contact_name, contact_phone: a.contact_phone,
+    })),
+  });
+});
+
 // ---- 必須書類（6種類固定） ----
 const REQUIRED_DOC_KEYS = ['koukoku', 'setsumei', 'shiyousho', 'mitsumori', 'keiyakusho', 'uchiwakesho'];
 const REQUIRED_DOC_LABELS = {
@@ -332,6 +496,98 @@ function agencyGroup(text) {
   return null;
 }
 
+// ---- 発注機関マスタの「類似ワード検索」 ----
+// 「大阪法務局」「大阪法務局（本局）」「大阪 法務局」のような表記ゆれでも同じ機関を引き当てられるよう、
+// 記号・空白・法人格の語を落として正規化したうえで、2文字ごとの並び（bigram）の一致率で近さを測る。
+// 発注機関は数千件規模でも一覧をメモリ上で回す程度なら十分速いため、DB側の全文検索は使っていない。
+function normalizeForSearch(s) {
+  if (!s) return '';
+  return String(s)
+    .normalize('NFKC')                       // 全角英数字→半角、半角カナ→全角カナ に揃える
+    .toLowerCase()
+    .replace(/[ぁ-ゖ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 0x60)) // ひらがな→カタカナ
+    .replace(/(株式会社|有限会社|一般社団法人|公益社団法人|独立行政法人|国立大学法人)/g, '')
+    .replace(/[\s　]+/g, '')
+    .replace(/[（）()「」『』【】［］\[\]・、,，。.．\-－ー―‐_/／\\]/g, '');
+}
+
+function bigrams(s) {
+  const out = [];
+  for (let i = 0; i < s.length - 1; i += 1) out.push(s.slice(i, i + 2));
+  return out;
+}
+
+// 2つの文字列の近さを0〜1で返す（Dice係数）。1文字だけの語は完全一致でのみ1になる。
+function similarityScore(a, b) {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const A = bigrams(a);
+  const B = bigrams(b);
+  if (A.length === 0 || B.length === 0) return 0;
+  const counts = new Map();
+  for (const g of B) counts.set(g, (counts.get(g) || 0) + 1);
+  let hit = 0;
+  for (const g of A) {
+    const c = counts.get(g);
+    if (c) {
+      hit += 1;
+      counts.set(g, c - 1);
+    }
+  }
+  return (2 * hit) / (A.length + B.length);
+}
+
+// 発注機関の候補を、入力語に近い順に返す。完全一致・前方一致・部分一致には加点する。
+function searchAgencyList(list, query, limit = 20) {
+  const q = normalizeForSearch(query);
+  if (!q) return list.slice(0, limit).map((a) => ({ ...a, score: 0 }));
+  return list
+    .map((a) => {
+      const n = normalizeForSearch(a.name);
+      let score = similarityScore(q, n);
+      if (n === q) score += 1;
+      else if (n.startsWith(q) || q.startsWith(n)) score += 0.5;
+      else if (n.includes(q) || q.includes(n)) score += 0.3;
+      return { ...a, score };
+    })
+    .filter((a) => a.score >= 0.25)
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'ja'))
+    .slice(0, limit);
+}
+
+const AGENCY_KIND_LABELS = { national: '国の機関', local: '地方公共団体', other: 'その他' };
+function normalizeAgencyKind(v) {
+  return ['national', 'local', 'other'].includes(v) ? v : 'national';
+}
+
+const ENGINEER_TYPE_LABELS = { own: '自社社員', exclusive: '専属', partner: '協力会社' };
+function normalizeEngineerType(v) {
+  return ['own', 'exclusive', 'partner'].includes(v) ? v : 'own';
+}
+
+async function listEngineers(includeInactive = false) {
+  const { rows } = await pool.query(
+    `SELECT * FROM engineers ${includeInactive ? '' : 'WHERE active = true'} ORDER BY active DESC, name`
+  );
+  return rows;
+}
+
+async function listAgencies() {
+  const { rows } = await pool.query('SELECT * FROM agencies ORDER BY name');
+  return rows;
+}
+
+// 2つの配置行が同一人物かどうか。
+// 両方とも技術者マスタから選ばれていればIDで判定し（氏名の表記が違っても同一人物と分かる）、
+// 片方でも手入力の場合は表示名を正規化して突き合わせる
+// （マスタ移行の途中で「マスタ選択の案件」と「手入力の案件」が混在しても検出できるようにするため）。
+function sameTechnician(a, b) {
+  if (a.engineer_id && b.engineer_id) return a.engineer_id === b.engineer_id;
+  const na = normalizeForSearch(a.engineer_name || a.person_name);
+  const nb = normalizeForSearch(b.engineer_name || b.person_name);
+  return !!na && na === nb;
+}
+
 // 同系統の発注機関に絞って、過去の案件で「提出済み」になった書類・チェックリスト項目を集める。
 // item_id / doc_key ごとに、どの案件で・誰が・いつ提出したかの一覧を返す。
 async function computePrecedents(currentProjectId, groupKey) {
@@ -386,7 +642,10 @@ async function computeProjectSummaries() {
   const { rows: items } = await pool.query('SELECT * FROM checklist_items ORDER BY category_id, sort_order');
   const { rows: statuses } = await pool.query('SELECT * FROM checklist_status');
   const { rows: docs } = await pool.query('SELECT * FROM required_documents');
-  const { rows: techs } = await pool.query('SELECT * FROM project_technicians');
+  const { rows: techs } = await pool.query(
+    `SELECT pt.*, e.name AS engineer_name FROM project_technicians pt
+     LEFT JOIN engineers e ON e.id = pt.engineer_id`
+  );
   const { rows: users } = await pool.query('SELECT id, display_name FROM users');
   const userNameById = {};
   users.forEach((u) => { userNameById[u.id] = u.display_name; });
@@ -404,17 +663,20 @@ async function computeProjectSummaries() {
     (techsByProject[t.project_id] ||= []).push(t);
   }
 
-  // 重複配置の検出（同一氏名・期間重複）
+  // 重複配置の検出（同一人物・期間重複）。
+  // 技術者マスタから選ばれていればengineer_idで同一人物と判定し、手入力の氏名しかない行は
+  // 表記ゆれを吸収した正規化後の氏名で突き合わせる（「川野 晴輝」と「川野晴輝」を同一人物として扱う）。
   const overlapProjectIds = new Set();
-  const validTechs = techs.filter(
-    (t) => t.person_name && !['×', '-', 'ー', ''].includes(t.person_name.trim()) && t.start_date && t.end_date
-  );
+  const validTechs = techs.filter((t) => {
+    const label = (t.engineer_name || t.person_name || '').trim();
+    return label && !['×', '-', 'ー', '✕'].includes(label) && t.start_date && t.end_date;
+  });
   for (let i = 0; i < validTechs.length; i++) {
     for (let j = i + 1; j < validTechs.length; j++) {
       const a = validTechs[i];
       const b = validTechs[j];
       if (a.project_id === b.project_id) continue;
-      if (a.person_name.trim() !== b.person_name.trim()) continue;
+      if (!sameTechnician(a, b)) continue;
       const overlap = a.start_date <= b.end_date && b.start_date <= a.end_date;
       if (overlap) {
         const severity = a.exclusive || b.exclusive ? 'red' : 'blue';
@@ -553,7 +815,9 @@ async function computeAnnualSchedule() {
   users.forEach((u) => { userNameById[u.id] = u.display_name; });
 
   const { rows: techs } = await pool.query(
-    `SELECT * FROM project_technicians WHERE start_date IS NOT NULL AND end_date IS NOT NULL ORDER BY start_date`
+    `SELECT pt.*, e.name AS engineer_name FROM project_technicians pt
+     LEFT JOIN engineers e ON e.id = pt.engineer_id
+     WHERE pt.start_date IS NOT NULL AND pt.end_date IS NOT NULL ORDER BY pt.start_date`
   );
   const techsByProject = {};
   techs.forEach((t) => {
@@ -564,12 +828,15 @@ async function computeAnnualSchedule() {
   // 技術者の配置期間の重複検知（同一氏名が期間の重なる別案件に配置されている場合。
   // 少なくとも一方が専任なら赤、両方とも非専任なら青）。年間工程表・体制の重複バッジと同じロジック。
   const overlapKeys = new Set();
-  const validTechs = techs.filter((t) => t.person_name && !['×', '-', 'ー', ''].includes(t.person_name.trim()));
+  const validTechs = techs.filter((t) => {
+    const label = (t.engineer_name || t.person_name || '').trim();
+    return label && !['×', '-', 'ー', '✕'].includes(label);
+  });
   for (let i = 0; i < validTechs.length; i++) {
     for (let j = i + 1; j < validTechs.length; j++) {
       const a = validTechs[i], b = validTechs[j];
       if (a.project_id === b.project_id) continue;
-      if (a.person_name.trim() !== b.person_name.trim()) continue;
+      if (!sameTechnician(a, b)) continue;
       const overlap = new Date(a.start_date) <= new Date(b.end_date) && new Date(b.start_date) <= new Date(a.end_date);
       if (overlap) {
         const sev = (a.exclusive || b.exclusive) ? 'red' : 'blue';
@@ -625,7 +892,7 @@ async function computeAnnualSchedule() {
       id: t.id,
       role: t.role,
       roleShort: TECH_ROLE_SHORT[t.role] || t.role,
-      personName: t.person_name,
+      personName: t.engineer_name || t.person_name,
       exclusive: t.exclusive,
       startDate: t.start_date,
       endDate: t.end_date,
@@ -649,6 +916,67 @@ async function computeAnnualSchedule() {
 app.get('/timeline', requireAuth, async (req, res) => {
   const schedule = await computeAnnualSchedule();
   res.render('timeline', { schedule });
+});
+
+// ---- 公共工事の受注実績一覧 ----
+// 低入札の「書式211号（過去に施工した公共工事名及びその発注者）」や、経営事項審査で使う
+// 完成工事高の集計元として使えるよう、登録済みの案件を年度別にまとめて一覧・出力できるようにする。
+// 契約金額は表示用テキスト（税込/税抜の書き方が案件ごとに違う）なので、数値化できたものだけ合計する。
+function parseAmountToNumber(text) {
+  if (!text) return null;
+  const normalized = String(text).normalize('NFKC').replace(/[,\s]/g, '');
+  const oku = normalized.match(/([0-9.]+)億/);
+  const man = normalized.match(/([0-9.]+)万/);
+  if (oku || man) {
+    return Math.round((oku ? parseFloat(oku[1]) * 100000000 : 0) + (man ? parseFloat(man[1]) * 10000 : 0));
+  }
+  const m = normalized.match(/[0-9]+/);
+  return m ? Number(m[0]) : null;
+}
+
+// 会計年度（4月始まり）。完成期日を基準にし、未入力なら着工日→契約日の順で拾う。
+function fiscalYearOf(date) {
+  if (!date) return null;
+  const d = new Date(date);
+  const y = d.getUTCFullYear();
+  return d.getUTCMonth() + 1 >= 4 ? y : y - 1;
+}
+
+app.get('/works', requireAuth, async (req, res) => {
+  const { rows: projects } = await pool.query(
+    `SELECT p.*, a.kind AS agency_kind, u.display_name AS assignee_name
+     FROM projects p
+     LEFT JOIN agencies a ON a.id = p.agency_id
+     LEFT JOIN users u ON u.id = p.assignee_user_id
+     ORDER BY COALESCE(p.construction_end_date, p.construction_start_date, p.contract_date) DESC NULLS LAST, p.created_at DESC`
+  );
+  const works = projects.map((p) => {
+    const baseDate = p.construction_end_date || p.construction_start_date || p.contract_date;
+    const amount = parseAmountToNumber(p.contract_amount);
+    const today = new Date();
+    const done = p.construction_end_date ? new Date(p.construction_end_date) < today : false;
+    return {
+      ...p,
+      fiscalYear: fiscalYearOf(baseDate),
+      amountNumber: amount,
+      agencyGroupKey: agencyGroup(`${p.agency || ''} ${p.name || ''}`),
+      completed: done,
+    };
+  });
+
+  // 年度ごとの集計（件数と、金額が数値として読み取れたものの合計）
+  const byYear = {};
+  for (const w of works) {
+    const key = w.fiscalYear === null ? '未設定' : `${w.fiscalYear}年度`;
+    if (!byYear[key]) byYear[key] = { count: 0, amount: 0, amountKnown: 0 };
+    byYear[key].count += 1;
+    if (w.amountNumber !== null) {
+      byYear[key].amount += w.amountNumber;
+      byYear[key].amountKnown += 1;
+    }
+  }
+
+  res.render('works', { works, byYear, AGENCY_KIND_LABELS });
 });
 
 // ---- 書類テンプレート（雛形のプレビュー・ダウンロード） ----
@@ -898,6 +1226,7 @@ app.get('/projects/:id', requireAuth, async (req, res) => {
     [projectId]
   );
   const { rows: techs } = await pool.query('SELECT * FROM project_technicians WHERE project_id = $1', [projectId]);
+  const engineers = await listEngineers();
   const { rows: contacts } = await pool.query(
     `SELECT ac.*, u.display_name AS created_by_name FROM agency_contacts ac
      LEFT JOIN users u ON u.id = ac.created_by
@@ -936,6 +1265,7 @@ app.get('/projects/:id', requireAuth, async (req, res) => {
     statusMap,
     docsMap,
     techMap,
+    engineers,
     contacts,
     CONTACT_METHOD_LABELS,
     CONTACT_DIRECTION_LABELS,
@@ -999,22 +1329,51 @@ app.post('/api/projects/:id/info', requireAuth, async (req, res) => {
     supervisor_name, supervisor_phone, mailing_address,
   } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ ok: false, error: '案件名は必須です' });
+  // 発注機関マスタとの紐付け：候補から選ばれていればそのIDを保存し、手入力のままなら
+  // 完全一致する機関があるときだけ自動で紐付ける（勝手に似た機関へ結び付けない）。
+  const agencyText = (agency || '').trim();
+  let agencyId = req.body.agency_id ? Number(req.body.agency_id) : null;
+  if (!agencyId && agencyText) {
+    const { rows } = await pool.query('SELECT id FROM agencies WHERE name = $1', [agencyText]);
+    if (rows[0]) agencyId = rows[0].id;
+  }
   await pool.query(
     `UPDATE projects SET name=$1, agency=$2, contract_amount=$3, period_text=$4, folder_url=$5,
        assignee_user_id=$6, construction_start_date=$7, construction_end_date=$8,
        contract_officer_name=$9, contract_officer_phone=$10, supervisor_name=$11, supervisor_phone=$12,
-       mailing_address=$13, updated_at=now(), updated_by=$14 WHERE id=$15`,
+       mailing_address=$13, agency_id=$14, updated_at=now(), updated_by=$15 WHERE id=$16`,
     [
-      name.trim(), agency || null, contract_amount || null, period_text || null, folder_url || null,
+      name.trim(), agencyText || null, contract_amount || null, period_text || null, folder_url || null,
       assignee_user_id ? Number(assignee_user_id) : null,
       construction_start_date || null, construction_end_date || null,
       contract_officer_name || null, contract_officer_phone || null,
       supervisor_name || null, supervisor_phone || null, mailing_address || null,
-      req.session.userId, projectId,
+      agencyId, req.session.userId, projectId,
     ]
   );
   await logActivity(projectId, req.session.userId, 'update_info', '基本情報を更新');
   res.json({ ok: true });
+});
+
+// 発注機関マスタへの新規登録（案件の基本情報欄から、その場で登録できるようにする）
+app.post('/api/projects/:id/agency-register', requireAuth, async (req, res) => {
+  const projectId = Number(req.params.id);
+  const name = (req.body.name || '').trim();
+  if (!name) return res.status(400).json({ ok: false, error: '機関名が空です' });
+  const { rows: existing } = await pool.query('SELECT id FROM agencies WHERE name = $1', [name]);
+  let agencyId;
+  if (existing[0]) {
+    agencyId = existing[0].id;
+  } else {
+    const { rows } = await pool.query(
+      'INSERT INTO agencies (name, kind, group_key, updated_by) VALUES ($1,$2,$3,$4) RETURNING id',
+      [name, normalizeAgencyKind(req.body.kind), agencyGroup(name), req.session.userId]
+    );
+    agencyId = rows[0].id;
+  }
+  await pool.query('UPDATE projects SET agency_id=$1, agency=$2, updated_at=now(), updated_by=$3 WHERE id=$4',
+    [agencyId, name, req.session.userId, projectId]);
+  res.json({ ok: true, agencyId, created: !existing[0] });
 });
 
 app.post('/projects/:id/archive', requireAuth, async (req, res) => {
@@ -1241,15 +1600,23 @@ app.post('/api/projects/:id/documents/:docKey/submission', requireAuth, async (r
 app.post('/api/projects/:id/technicians/:role', requireAuth, async (req, res) => {
   const projectId = Number(req.params.id);
   const role = decodeURIComponent(req.params.role);
-  const { person_name, exclusive, start_date, end_date } = req.body;
+  const { person_name, exclusive, start_date, end_date, engineer_id } = req.body;
+  // 技術者マスタから選んだ場合はengineer_idを保持し、氏名もマスタの表記でそろえて保存しておく
+  // （マスタを使わず手入力した場合はengineer_id=NULLのまま、従来どおり氏名だけで運用できる）。
+  const engineerId = engineer_id ? Number(engineer_id) : null;
+  let personName = (person_name || '').trim() || null;
+  if (engineerId) {
+    const { rows } = await pool.query('SELECT name FROM engineers WHERE id = $1', [engineerId]);
+    if (rows[0]) personName = rows[0].name;
+  }
   await pool.query(
-    `INSERT INTO project_technicians (project_id, role, person_name, exclusive, start_date, end_date, updated_by, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7, now())
+    `INSERT INTO project_technicians (project_id, role, person_name, exclusive, start_date, end_date, engineer_id, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now())
      ON CONFLICT (project_id, role) DO UPDATE SET
-       person_name=$3, exclusive=$4, start_date=$5, end_date=$6, updated_by=$7, updated_at=now()`,
-    [projectId, role, person_name || null, exclusive === 'true' || exclusive === true, start_date || null, end_date || null, req.session.userId]
+       person_name=$3, exclusive=$4, start_date=$5, end_date=$6, engineer_id=$7, updated_by=$8, updated_at=now()`,
+    [projectId, role, personName, exclusive === 'true' || exclusive === true, start_date || null, end_date || null, engineerId, req.session.userId]
   );
-  await logActivity(projectId, req.session.userId, 'update_technician', `${role}を更新（${person_name || '未設定'}）`);
+  await logActivity(projectId, req.session.userId, 'update_technician', `${role}を更新（${personName || '未設定'}）`);
   res.json({ ok: true });
 });
 

@@ -46,6 +46,49 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS mailing_address TEXT;           --
 -- 低入札価格調査の対象案件かどうか（対象の場合、専用の追加書類16件を required_documents に持つ）
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_low_bid BOOLEAN NOT NULL DEFAULT false;
 
+-- 技術者マスタ（自社の主任技術者・監理技術者・現場代理人の候補者）。
+-- 案件ごとに氏名を手入力していると表記ゆれで重複配置チェックが効かないため、マスタから選ぶ方式にする。
+-- 低入札の「配置予定技術者名簿（書式205号）」や実務経験証明書の作成元データにもなる（2026年9月〜）。
+CREATE TABLE IF NOT EXISTS engineers (
+  id                SERIAL PRIMARY KEY,
+  name              TEXT NOT NULL,
+  name_kana         TEXT,
+  employment_type   TEXT NOT NULL DEFAULT 'own',   -- 'own'（自社社員） | 'exclusive'（専属） | 'partner'（協力会社）
+  qualifications    TEXT,            -- 保有資格（例: 1級電気工事施工管理技士、第一種電気工事士）
+  license_number    TEXT,            -- 資格者証番号（監理技術者資格者証番号等）
+  experience_years  TEXT,            -- 実務経験年数（表示用テキスト）
+  phone             TEXT,
+  birth_date        DATE,            -- 配置予定技術者名簿等で年齢欄が必要な場合に使用（任意）
+  note              TEXT,
+  active            BOOLEAN NOT NULL DEFAULT true,  -- 退職等で候補から外す場合はfalse（過去の配置履歴は残す）
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by        INT REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_engineers_active ON engineers(active, name);
+
+-- 発注機関マスタ。発注機関名を毎回手入力すると表記ゆれが起きるため、マスタから類似ワード検索で選ぶ。
+-- kindはNJSSモドキの「機関種別」に合わせて 国の機関／地方公共団体 の区分を持つ（2026年9月〜）。
+CREATE TABLE IF NOT EXISTS agencies (
+  id               SERIAL PRIMARY KEY,
+  name             TEXT NOT NULL,
+  kind             TEXT NOT NULL DEFAULT 'national',  -- 'national'（国の機関） | 'local'（地方公共団体） | 'other'（その他）
+  group_key        TEXT,            -- 系統（法務省・国土交通省 等）。同系統発注機関の実績検索に使う
+  address          TEXT,
+  contact_name     TEXT,            -- 契約担当者等
+  contact_phone    TEXT,
+  mailing_address  TEXT,            -- 郵送物の送り先（案件作成時の初期値に使える）
+  note             TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by       INT REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_agencies_name ON agencies(name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agencies_name_unique ON agencies(name);
+
+-- 案件から各マスタへの参照（既存のテキスト列 agency はそのまま残し、段階的に移行できるようにする）
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS agency_id INT REFERENCES agencies(id);
+
 -- 体制・工程（監理技術者／主任技術者／現場代理人）。1案件につき役割ごとに1行。
 CREATE TABLE IF NOT EXISTS project_technicians (
   id           SERIAL PRIMARY KEY,
@@ -59,6 +102,9 @@ CREATE TABLE IF NOT EXISTS project_technicians (
   updated_by   INT REFERENCES users(id),
   UNIQUE(project_id, role)
 );
+-- 技術者マスタから選んだ場合の参照。person_name（手入力の氏名）は互換のため残し、
+-- engineer_idがある行はマスタの氏名を正として表示する。重複配置チェックもIDが両方にあればID優先で判定する。
+ALTER TABLE project_technicians ADD COLUMN IF NOT EXISTS engineer_id INT REFERENCES engineers(id);
 
 -- 発注機関とのやり取り履歴（電話・メール等）。案件ごとに時系列で記録する（2026年8月〜）。
 -- direction: 'outgoing'＝自社（受注者）からのアクション／'incoming'＝発注機関からの連絡・返信。
